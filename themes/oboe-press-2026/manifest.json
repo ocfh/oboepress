@@ -1,0 +1,19 @@
+{
+  "name": "OboePress 2026",
+  "slug": "oboe-press-2026",
+  "description": "Default dark blog theme with elegant typography",
+  "version": "1.0.0",
+  "author": "OboePress",
+  "isDefault": true,
+  "config": {
+    "background": "#0b0d12",
+    "surface": "#161922",
+    "text": "#e8eaf0",
+    "muted": "#9aa3b2",
+    "accent": "#7c8cff",
+    "accentText": "#0b0d12",
+    "border": "#262b36",
+    "radius": "14px",
+    "font": "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif"
+  }
+}
