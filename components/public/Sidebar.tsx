@@ -1,0 +1,84 @@
+import Link from "next/link";
+import { Search, Folder, Tags, Clock } from "lucide-react";
+import { listCategories, listTags } from "@/lib/services/taxonomies";
+import { listPosts } from "@/lib/services/posts";
+import { formatDate } from "@/lib/utils";
+
+export default async function Sidebar() {
+  const [cats, tags, recent] = await Promise.all([
+    listCategories(),
+    listTags(),
+    listPosts({ status: "published", limit: 5 }),
+  ]);
+
+  return (
+    <aside className="space-y-6">
+      <form action="/search" method="get" className="block">
+        <div className="relative">
+          <Search
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+          />
+          <input
+            name="q"
+            placeholder="搜索文章…"
+            className="w-full rounded-full border border-[var(--border)] bg-[var(--surface)] py-2 pl-9 pr-4 text-sm outline-none focus:border-[var(--accent)]"
+          />
+        </div>
+      </form>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+          <Folder size={15} />
+          分类
+        </h3>
+        <ul className="space-y-1 text-sm">
+          {cats.map((c) => (
+            <li key={c.id}>
+              <Link href={`/blog/category/${c.slug}`} className="text-zinc-300 hover:text-[var(--accent)]">
+                {c.name}
+              </Link>
+            </li>
+          ))}
+          {cats.length === 0 && <li className="text-zinc-500">暂无分类</li>}
+        </ul>
+      </div>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+          <Tags size={15} />
+          标签
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {tags.map((t) => (
+            <Link
+              key={t.id}
+              href={`/blog/tag/${t.slug}`}
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-zinc-300 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+            >
+              #{t.name}
+            </Link>
+          ))}
+          {tags.length === 0 && <span className="text-xs text-zinc-500">暂无标签</span>}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+          <Clock size={15} />
+          最新文章
+        </h3>
+        <ul className="space-y-2 text-sm">
+          {recent.items.map((p) => (
+            <li key={p.id}>
+              <Link href={`/blog/${p.slug}`} className="text-zinc-300 hover:text-[var(--accent)]">
+                {p.title}
+              </Link>
+              <p className="text-xs text-zinc-500">{formatDate(p.publishedAt)}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </aside>
+  );
+}
