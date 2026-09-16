@@ -36,6 +36,13 @@
       "when": 1788140133464,
       "tag": "0004_needy_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789574400000,
+      "tag": "0005_category_icon",
+      "breakpoints": true
     }
   ]
 }

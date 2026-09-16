@@ -80,6 +80,7 @@ const typeDefs = /* GraphQL */ `
     name: String!
     slug: String!
     description: String
+    icon: String
     parentId: Int
   }
 

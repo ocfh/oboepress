@@ -51,6 +51,7 @@ export async function createCategory(
       slug,
       description: input.description,
       parentId: input.parentId ?? null,
+      icon: input.icon ?? null,
     })
     .returning();
   return row;
@@ -83,6 +84,7 @@ export async function updateCategory(
         input.description !== undefined ? input.description : existing.description,
       parentId:
         input.parentId !== undefined ? input.parentId ?? null : existing.parentId,
+      icon: input.icon !== undefined ? input.icon : existing.icon,
     })
     .where(eq(categories.id, id));
   return getCategory(id);

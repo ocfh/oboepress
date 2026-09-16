@@ -148,6 +148,8 @@ export const categories = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     description: text("description"),
+    // Lucide icon identifier (kebab-case, e.g. "folder-open"); null = default icon.
+    icon: text("icon"),
     // Self-reference intentionally kept as a plain integer to avoid a
     // circular type-inference cycle; integrity is maintained in the service layer.
     parentId: integer("parent_id"),

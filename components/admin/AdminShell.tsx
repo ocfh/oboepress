@@ -16,6 +16,7 @@ import {
   Users,
   Plug,
   LayoutGrid,
+  Shapes,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adm
   { href: "/admin/media", label: "媒体库", icon: Images },
   { href: "/admin/categories", label: "分类", icon: Folder },
   { href: "/admin/tags", label: "标签", icon: Tags },
+  { href: "/admin/icons", label: "图标库", icon: Shapes },
   { href: "/admin/comments", label: "评论", icon: MessageSquare, adminOnly: true },
   { href: "/admin/themes", label: "主题", icon: Palette },
   { href: "/admin/widgets", label: "小工具", icon: LayoutGrid, superOnly: true },

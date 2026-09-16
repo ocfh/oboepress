@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { Folder, Tags, Plus, Trash2, GripVertical } from "lucide-react";
+import IconPicker from "@/components/admin/IconPicker";
+import IconGlyph from "@/components/IconGlyph";
 
 type Item = {
   id: number;
   name: string;
   slug: string;
   description?: string | null;
+  icon?: string | null;
   parentId: number | null;
   order: number;
 };
@@ -48,6 +51,7 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
   const [parentId, setParentId] = useState<string>("");
+  const [newIcon, setNewIcon] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
 
@@ -73,6 +77,7 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
     if (isCategory) {
       if (description) payload.description = description;
       if (parentId) payload.parentId = Number(parentId);
+      payload.icon = newIcon;
     }
     const res = await fetch(endpoint, {
       method: "POST",
@@ -84,6 +89,7 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
       setSlug("");
       setDescription("");
       setParentId("");
+      setNewIcon(null);
       setMsg("已添加 ✓");
       load();
     } else {
@@ -96,6 +102,23 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
     if (!confirm("删除？")) return;
     const res = await fetch(`${endpoint}/${id}`, { method: "DELETE" });
     if (res.ok) load();
+  }
+
+  /** Save a category's icon (null clears it); optimistic UI update. */
+  async function updateIcon(id: number, icon: string | null) {
+    setItems((prev) => prev.map((c) => (c.id === id ? { ...c, icon } : c)));
+    const res = await fetch(`${endpoint}/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ icon }),
+    });
+    if (res.ok) {
+      setMsg("图标已保存 ✓");
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setMsg((d as { error?: string }).error || "图标保存失败");
+      load();
+    }
   }
 
   async function saveOrder(ordered: Item[]) {
@@ -195,6 +218,10 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
                 className="rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
             </div>
+            <div>
+              <p className="mb-1 text-sm text-zinc-300">图标（可选）</p>
+              <IconPicker value={newIcon} onChange={setNewIcon} />
+            </div>
           </>
         )}
         <button
@@ -251,7 +278,11 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
                       {isChild && (
                         <span className="text-zinc-600 select-none">└ </span>
                       )}
-                      <TitleIcon size={15} className="text-zinc-500 shrink-0" />
+                      {isCategory && it.icon ? (
+                        <IconGlyph name={it.icon} size={15} className="text-zinc-500" />
+                      ) : (
+                        <TitleIcon size={15} className="text-zinc-500 shrink-0" />
+                      )}
                       {it.name}
                     </span>
                   </td>
@@ -260,6 +291,15 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
                     <td className="px-4 py-3 text-zinc-500">{it.description ?? "—"}</td>
                   )}
                   <td className="px-4 py-3 text-right">
+                    {isCategory && (
+                      <span className="mr-2 align-middle">
+                        <IconPicker
+                          compact
+                          value={it.icon ?? null}
+                          onChange={(v) => updateIcon(it.id, v)}
+                        />
+                      </span>
+                    )}
                     <button
                       onClick={() => remove(it.id)}
                       className="inline-flex items-center gap-1 rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950"

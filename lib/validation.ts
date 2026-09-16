@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidLucideIconName } from "./icon-names";
 
 /** Zod schema for the block-based content (shared by REST + GraphQL). */
 export const blockSchema = z.union([
@@ -92,11 +93,24 @@ export const pageInputSchema = z.object({
   metas: z.array(z.object({ key: z.string(), value: z.string() })).optional(),
 });
 
+/** Optional Lucide icon identifier (kebab-case); empty string / null clears it. */
+export const categoryIconSchema = z.preprocess(
+  (v) => (v === "" ? null : v),
+  z
+    .string()
+    .max(64)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "图标标识符格式不正确")
+    .refine((v) => isValidLucideIconName(v), "不是内置图标标识符，请到「图标库」核对")
+    .nullable()
+    .optional(),
+);
+
 export const categoryInputSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().max(120).optional(),
   description: z.string().max(500).optional(),
   parentId: z.number().int().positive().optional(),
+  icon: categoryIconSchema,
 });
 
 export const tagInputSchema = z.object({

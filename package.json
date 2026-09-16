@@ -16,6 +16,7 @@
     "db:reset": "tsx db/reset.ts",
     "db:sql": "tsx db/sql.ts",
     "db:studio": "cd db && drizzle-kit studio --config=drizzle.config.ts",
+    "icons:gen": "node scripts/gen-icon-assets.cjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
