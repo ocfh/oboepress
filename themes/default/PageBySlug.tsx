@@ -1,8 +1,8 @@
-import { notFound } from "next/navigation";
+﻿import { notFound } from "next/navigation";
 import { getPageBySlug, incrementViews } from "@/lib/services/pages";
 import { getSettings } from "@/lib/services/settings";
 import { renderContent, buildHeadNodes } from "@/lib/services/render";
-import Comments from "@/components/public/Comments";
+import Comments from "@/components/shared/Comments";
 
 export const dynamic = "force-dynamic";
 

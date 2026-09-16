@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { listPosts } from "@/lib/services/posts";
 import { getSettings } from "@/lib/services/settings";
-import PostCard from "@/components/public/PostCard";
-import Sidebar from "@/components/public/Sidebar";
+import PostCard from "@/components/shared/PostCard";
+import Sidebar from "@/components/shared/Sidebar";
 
 export const dynamic = "force-dynamic";
 

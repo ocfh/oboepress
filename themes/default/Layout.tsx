@@ -1,8 +1,8 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Search } from "lucide-react";
 import { getSettings } from "@/lib/services/settings";
 import { getMenuByLocation } from "@/lib/services/menus";
-import NavTree from "@/components/public/NavTree";
+import NavTree from "@/components/shared/NavTree";
 
 /**
  * OboePress default theme layout — dark blog with header nav + footer.

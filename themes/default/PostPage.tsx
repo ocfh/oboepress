@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, User, Calendar, Eye, MessageCircle } from "lucide-react";
 import { getPostBySlug, incrementViews } from "@/lib/services/posts";
@@ -10,13 +10,13 @@ import {
   buildPostMeta,
   buildHeadNodes,
 } from "@/lib/services/render";
-import Comments from "@/components/public/Comments";
-import Sidebar from "@/components/public/Sidebar";
-import Breadcrumb from "@/components/public/Breadcrumb";
-import PostToc from "@/components/public/PostToc";
-import ShareButtons from "@/components/public/ShareButtons";
-import RelatedPosts from "@/components/public/RelatedPosts";
-import WidgetArea from "@/components/public/WidgetArea";
+import Comments from "@/components/shared/Comments";
+import Sidebar from "@/components/shared/Sidebar";
+import Breadcrumb from "@/components/shared/Breadcrumb";
+import PostToc from "@/components/shared/PostToc";
+import ShareButtons from "@/components/shared/ShareButtons";
+import RelatedPosts from "@/components/shared/RelatedPosts";
+import WidgetArea from "@/components/shared/WidgetArea";
 import { THEME_SLUG } from "@/themes/default";
 
 export const dynamic = "force-dynamic";
