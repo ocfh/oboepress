@@ -19,14 +19,12 @@ export default function SetupPage() {
   const [dbUrl, setDbUrl] = useState("");
   const [storage, setStorage] = useState<"local" | "vercel-blob">("local");
   const [blobToken, setBlobToken] = useState("");
-  const [dbNotice, setDbNotice] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setDbNotice("");
     setLoading(true);
 
     // Persist the chosen database driver + storage before completing setup.
@@ -55,12 +53,6 @@ export default function SetupPage() {
       setError(dbErr.error || "数据库配置失败");
       setLoading(false);
       return;
-    }
-    const dbData = await dbRes.json();
-    if (dbData.restartRequired) {
-      setDbNotice(
-        "已保存数据库与存储配置。请重启服务（npm run dev）使设置生效后再继续使用。",
-      );
     }
 
     const res = await fetch("/api/setup", {
@@ -203,12 +195,6 @@ export default function SetupPage() {
             </>
           )}
         </fieldset>
-
-        {dbNotice && (
-          <p className="mt-3 rounded-md border border-amber-600/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
-            {dbNotice}
-          </p>
-        )}
 
         <fieldset className="mt-6 rounded-lg border border-zinc-800 p-4">
           <legend className="px-2 text-xs text-zinc-500">站点信息</legend>

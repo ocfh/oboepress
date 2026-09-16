@@ -92,6 +92,38 @@ function getDb(): Database {
  * The promise is cached on globalThis so concurrent first requests coalesce
  * into a single migration run (important under Next dev hot-reload).
  */
+/**
+ * Switch the active database at runtime (used by first-run setup when the user
+ * picks "remote database"). Mutates `process.env` and drops every cached handle,
+ * so the next `getDb()` builds a fresh client against the new target — no server
+ * restart required. The previous client is closed first to avoid leaking a socket
+ * or file handle back onto a database we just left.
+ *
+ * Because `process.env` is process-global and persists across requests in a dev
+ * server, a subsequent `/api/setup` call in the same process writes straight to
+ * the newly configured database. (On Vercel serverless each request may be a new
+ * instance and env is set via the dashboard — the install wizard targets local
+ * dev, which is exactly where this one-shot switch is needed.)
+ */
+export async function reconfigureDatabase(driver: Driver, url: string): Promise<void> {
+  process.env.DB_DRIVER = driver;
+  process.env.DATABASE_URL =
+    driver === "postgres" ? url : url || "./.data/pglite_live";
+
+  // Best-effort teardown of the previously opened client(s) so the switch
+  // doesn't leave stale handles behind. The new client is independent.
+  try {
+    if (postgresClient) await postgresClient.end({ timeout: 2 });
+    if (pgliteClient) await pgliteClient.close();
+  } catch {
+    // ignore teardown errors — a fresh client is created regardless
+  }
+  postgresClient = null;
+  pgliteClient = null;
+  globalForDb.__oboeDb = undefined;
+  globalForDb.__oboeMigrated = undefined;
+}
+
 export function ensureMigrations(): Promise<void> {
   if (!globalForDb.__oboeMigrated) {
     globalForDb.__oboeMigrated = (async () => {

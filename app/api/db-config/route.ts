@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { ok, fail } from "@/lib/http";
+import { reconfigureDatabase } from "@/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -82,10 +83,16 @@ export async function POST(req: Request) {
 
   writeEnvLocal(entries);
 
+  // Apply the chosen driver/URL to the *running* process so a subsequent
+  // /api/setup in the same session writes straight to the target database —
+  // no server restart needed. .env.local is still written so a future launch
+  // boots with the same config.
+  await reconfigureDatabase(
+    driver,
+    driver === "postgres" ? (url as string) : "./.data/pglite_live",
+  );
+
   return ok({
-    // Next reads env at process start and the running DB client is already open,
-    // so a process restart is required for the new driver to take effect.
-    restartRequired: true,
     driver,
     storage: storage ?? "local",
   });
