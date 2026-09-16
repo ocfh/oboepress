@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, ensureMigrations } from "../../db";
 import {
   siteSettings,
@@ -114,6 +114,4 @@ async function runBootstrap(): Promise<void> {
         .where(eq(siteSettings.id, 1));
     }
   }
-
-  void sql;
 }

@@ -1,10 +1,9 @@
 /**
- * Demo content seed for the Samsara theme.
+ * Demo content seed for the Bluemix theme.
  *
  * Creates a demo author, 4 categories, a handful of tags and ~10 published
  * posts with cover images so the homepage, coverflow hero and sidebar widgets
- * actually have something to render — making the theme visually comparable to
- * the nvPress official demo (blog.panda-studio.cn).
+ * actually have something to render at first boot.
  *
  * Safe to re-run: skips anything already present. Run from the project root:
  *   npm run db:seed-demo
@@ -30,6 +29,13 @@ import type { Block } from "@/lib/blocks";
 
 const PASSWORD = "demo123456";
 
+// Guaranteed local admin: always upserted to these same credentials on every
+// re-run, so local testing always has a definite account/password to use.
+// (db:seed demo — dev only; the /admin/setup wizard still creates fresh
+// accounts in production-style first runs.)
+const ADMIN_EMAIL = "admin@cms.local";
+const ADMIN_PASSWORD = "admin123";
+
 const CATEGORIES = [
   { name: "设计与灵感", slug: "design" },
   { name: "生活随笔", slug: "life" },
@@ -49,7 +55,7 @@ function slugify(s: string): string {
 }
 
 function cover(n: number): string {
-  return `https://picsum.photos/seed/samsara${n}/900/640`;
+  return `https://picsum.photos/seed/Bluemix${n}/900/640`;
 }
 
 function excerptOf(paras: string[]): string {
@@ -79,13 +85,13 @@ const POSTS: Array<{
   comments: number;
 }> = [
   {
-    title: "复盘「Samsara」玻璃拟物主题 · Design",
+    title: "复盘「Bluemix」玻璃拟物主题 · Design",
     cat: "design",
     tags: ["玻璃拟物", "主题开发"],
     paras: [
       "Glassmorphism——玻璃拟物——是近年最受欢迎的界面趋势之一。半透明、背景模糊、细描边加上高光层的组合，让卡片像悬浮在彩色背景上的毛玻璃。",
-      "这套 pandastudio-samsara 主题正是这种语言的代表作：浅蓝灰画布上叠加白色半透明卡片，配合封面大图与封面覆盖层，整体通透又有层次。",
-      "在移植到 OboePress 时，我们把主题的视觉变量、卡片色调计算和布局结构一一对齐，确保渲染出来的观感与原版一致。",
+      "这套 Bluemix 主题正是这种语言的代表作：浅蓝灰画布上叠加白色半透明卡片，配合封面大图与封面覆盖层，整体通透又有层次。",
+      "Bluemix 精心对齐了视觉变量、卡片色调计算与布局结构，让整体观感通透而统一。",
     ],
     views: 1280,
     comments: 24,
@@ -97,7 +103,7 @@ const POSTS: Array<{
     paras: [
       "OboePress 是一个 Serverless 友好的内容管理系统，核心基于 Next.js、Drizzle 与 PostgreSQL，同时内置 pglite 让本地零配置即可运行。",
       "主题采用注册表机制，业务代码与 UI 解耦。切换主题只需修改 activeThemeSlug，前端布局组件随之替换。",
-      "这让博客的主题化开发变得非常顺滑——把 nvPress 的成熟主题搬进来，只写一小层适配层即可。",
+      "这让博客的主题化开发变得非常顺滑——在 OboePress 的注册表机制下，主题与业务代码完全解耦，切换主题只需一行配置。",
     ],
     views: 956,
     comments: 18,
@@ -179,9 +185,9 @@ const POSTS: Array<{
     cat: "design",
     tags: ["玻璃拟物", "主题开发"],
     paras: [
-      "官方示范选用浅色方案：浅蓝灰的背景、白色半透明卡片与深色文字，让玻璃质感在白天光线下呈现得最干净。",
+      "默认出品为浅色方案：浅蓝灰的背景、白色半透明卡片与深色文字，让玻璃质感在白天光线下呈现得最干净。",
       "深色模式下玻璃拟物同样成立，但高光与阴影的关系需要反向调整，避免文字漂浮在浑浊的底上。",
-      "本主题默认浅色，与官方 blog.panda-studio.cn 保持一致。",
+      "本主题默认浅色，通透的观感留给阅读本身。",
     ],
     views: 522,
     comments: 9,
@@ -204,26 +210,26 @@ async function main() {
   await ensureMigrations();
   await ensureBootstrap(); // site_settings + themes + menus
 
-  // Point the public site at the Samsara theme and give it an identity, so the
-  // fresh database opens straight into the ported theme (no setup wizard).
+  // Point the public site at the Bluemix theme and give it an identity, so the
+  // fresh database opens straight into the Bluemix theme (no setup wizard).
   await db
     .update(siteSettings)
     .set({
-      activeThemeSlug: "samsara",
-      siteTitle: "Panda Studio",
-      siteDescription: "Design a colorful life — 玻璃拟物主题 Samsara",
+      activeThemeSlug: "Bluemix",
+      siteTitle: "OboePress 示例站",
+      siteDescription: "Design a colorful life — 玻璃拟物主题 Bluemix",
       tagline: "设计、摄影与生活的色彩",
-      footerText: "Designed & Coded by PANDA Studio",
+      footerText: "Designed & Coded by OboePress",
       logoUrl: "",
     })
     .where(eq(siteSettings.id, 1));
-  console.log("✓ 活动主题已设为 samsara");
+  console.log("✓ 活动主题已设为 Bluemix");
 
   // 1. Demo author
   let author = await db
     .select()
     .from(users)
-    .where(eq(users.email, "demo@panda-studio.cn"))
+    .where(eq(users.email, "demo@example.com"))
     .limit(1);
   let authorId: number;
   if (author.length) {
@@ -233,15 +239,39 @@ async function main() {
     const [u] = await db
       .insert(users)
       .values({
-        email: "demo@panda-studio.cn",
-        name: "Panda Studio",
+        email: "demo@example.com",
+        name: "OboePress 演示作者",
         passwordHash: await bcrypt.hash(PASSWORD, 10),
         role: "admin",
-        bio: "Samsara 主题演示作者",
+        bio: "Bluemix 主题演示作者",
       })
       .returning();
     authorId = u.id;
     console.log("✓ 创建演示作者 #" + authorId + "（密码 " + PASSWORD + "）");
+  }
+
+  // 1b. Guaranteed local admin login — always reset to the fixed password so
+  // the account/password is never "different next time".
+  await db
+    .update(users)
+    .set({ role: "admin", passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10) })
+    .where(eq(users.email, ADMIN_EMAIL));
+  const [adminRow] = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, ADMIN_EMAIL))
+    .limit(1);
+  if (!adminRow) {
+    await db.insert(users).values({
+      email: ADMIN_EMAIL,
+      name: "站长",
+      role: "admin",
+      bio: "本地测试管理员",
+      passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10),
+    });
+    console.log("✓ 创建本地管理员 " + ADMIN_EMAIL + "（密码 " + ADMIN_PASSWORD + "）");
+  } else {
+    console.log("✓ 已重置本地管理员 " + ADMIN_EMAIL + " 的密码为 " + ADMIN_PASSWORD);
   }
 
   // 2. Categories (get-or-create)

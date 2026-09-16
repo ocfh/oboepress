@@ -1,14 +1,7 @@
 /**
- * Server-only avatar URL resolver for built-in comments.
- *
- * Supports Gravatar and the popular China-friendly mirrors, plus the special
- * case where a commenter's email is a `@qq.com` address — in that case the QQ
- * number (the local part) resolves straight to the user's QQ avatar via the
- * qlogo API, which is exactly what most Chinese blogs want.
- *
- * This module imports `node:crypto`, so it MUST only be used on the server
- * (API routes / services). Never import it from a client component — the
- * avatar URL is computed here and passed to the browser as a finished string.
+ * Server-only avatar URL resolver（内置评论）。支持 Gravatar 及国内镜像；
+ * `@qq.com` 邮箱按 QQ 号直连 qlogo 取头像。引用了 node:crypto，
+ * 仅供服务端使用，绝不可在客户端组件里 import。
  */
 import { createHash } from "node:crypto";
 

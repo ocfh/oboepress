@@ -1,21 +1,8 @@
 /**
- * Hook system — the extension contract shared by plugins and themes.
- *
- * Modelled on WordPress / nvPress: a global registry of named hooks, each
- * holding an ordered list of callbacks.
- *
- *  - **Action**  — fire and forget. `doAction("post.published", { post })`
- *  - **Filter**  — transform a payload. `applyFilters("post.content", { html })`
- *
- * Conventions (deliberately identical to nvPress so ported plugins feel native):
- *  1. A callback receives **one payload object** and, for filters, returns it.
- *  2. `priority` defaults to `10`; lower runs first.
- *  3. The same function reference is never registered twice for a hook — this
- *     makes registration idempotent under Next.js hot-reload and repeated
- *     module evaluation in serverless.
- *
- * The registry lives on `globalThis` so dev hot-reload and multiple route
- * modules share one instance instead of each getting a private copy.
+ * Hook system — extension contract shared by plugins and themes.
+ * Named registry of ordered callbacks: actions are fire-and-forget, filters
+ * transform a payload. One payload object in/out, default priority 10,
+ * idempotent registration, shared on globalThis across routes.
  */
 
 export type HookCallback<P = any> = (payload: P) => P | void | Promise<P | void>;
@@ -90,16 +77,6 @@ export function addFilter<P = any>(
   });
 }
 
-export function removeAction(hook: string, callback: HookCallback): void {
-  const list = registry().actions.get(hook);
-  if (list) registry().actions.set(hook, list.filter((r) => r.callback !== callback));
-}
-
-export function removeFilter(hook: string, callback: HookCallback): void {
-  const list = registry().filters.get(hook);
-  if (list) registry().filters.set(hook, list.filter((r) => r.callback !== callback));
-}
-
 /** Drop every registration made by a plugin/theme (used when disabling it). */
 export function removeAllByOwner(owner: string): void {
   const r = registry();
@@ -116,17 +93,6 @@ export function doAction<P = any>(hook: string, payload?: P): void {
       r.callback(payload as P);
     } catch (err) {
       console.error(`[hooks] action "${hook}" (${r.owner ?? "core"}) failed:`, err);
-    }
-  }
-}
-
-/** Fire an action and await every listener. */
-export async function doAsyncAction<P = any>(hook: string, payload?: P): Promise<void> {
-  for (const r of registry().actions.get(hook) ?? []) {
-    try {
-      await r.callback(payload as P);
-    } catch (err) {
-      console.error(`[hooks] async action "${hook}" (${r.owner ?? "core"}) failed:`, err);
     }
   }
 }
@@ -201,6 +167,10 @@ export const HOOKS = {
   widgetTypes: "widget.types",
   /** filter — ({ shortcodes }) register extra shortcodes */
   shortcodes: "shortcode.register",
+  /** filter — ({ fields }) extra editor fields for the post/page editor. Theme
+   *  and plugin authors add fields here so the shared editor renders them.
+   *  Payload is `{ fields: Record<string, ThemeEditorField> }`; return merged. */
+  editorFields: "editor.fields",
   /** action — ({ post }) fired after a post transitions to published */
   postPublished: "post.published",
   /** action — ({ post }) fired after any post save */

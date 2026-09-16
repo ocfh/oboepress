@@ -1,5 +1,7 @@
 import { getSession } from "@/lib/auth";
 import AdminShell from "@/components/admin/AdminShell";
+import { HOOKS, applyAsyncFilters } from "@/lib/hooks";
+import type { AdminMenuItem } from "@/lib/admin-extensions";
 
 export default async function AdminLayout({
   children,
@@ -7,5 +9,12 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const user = await getSession();
-  return <AdminShell user={user}>{children}</AdminShell>;
+  const { items } = await applyAsyncFilters(HOOKS.adminMenu, {
+    items: [] as AdminMenuItem[],
+  });
+  return (
+    <AdminShell user={user} pluginNav={items}>
+      {children}
+    </AdminShell>
+  );
 }

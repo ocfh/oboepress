@@ -1,11 +1,8 @@
 import type { ThemeConfig } from "@/db/schema";
 
 /**
- * 系统内置的出厂默认主题配置。任何自定义主题都可以通过"恢复默认"一键
- * 重置回这组数值，保证用户永远能回到干净状态。
- *
- * 每个键都会被序列化成一个 CSS 自定义属性挂到 :root 上，主题样式表直接
- * 用 var(--xxx) 消费 —— 所以「换肤」不需要改一行代码。
+ * 出厂默认主题配置，任何主题都可一键「恢复默认」重置回这组数值。每个键被
+ * 序列化为 :root 上的 CSS 自定义属性供主题样式表消费，换肤无需改代码。
  */
 export const DEFAULT_THEME_CONFIG: Required<ThemeConfig> = {
   // Palette
@@ -65,8 +62,7 @@ export const DEFAULT_THEME_CONFIG: Required<ThemeConfig> = {
 
 const FALLBACK = DEFAULT_THEME_CONFIG;
 
-/** camelCase token key -> CSS custom property name (`accentText` -> `--accent-text`). */
-export function tokenToCssVar(key: string): string {
+function tokenToCssVar(key: string): string {
   return `--${key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`)}`;
 }
 

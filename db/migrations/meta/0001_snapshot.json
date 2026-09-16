@@ -1028,7 +1028,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'sewpress'"
+          "default": "'oboepress'"
         },
         "footer_text": {
           "name": "footer_text",

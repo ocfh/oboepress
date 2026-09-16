@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import ThemeSettingsForm from "@/components/ThemeSettingsForm";
 import { getThemePanel } from "@/lib/services/themes";
-import { getThemeManifest } from "@/themes/registry";
+import { getThemeManifest, loadThemeModule } from "@/themes/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -19,21 +19,31 @@ export default async function ThemeSettingsPage({
   if (!panel) notFound();
 
   const manifest = getThemeManifest(panel.theme.slug);
+  const themeModule = await loadThemeModule(panel.theme.slug);
+  const SettingsPanel = themeModule?.settingsPanel;
 
   return (
-    <ThemeSettingsForm
-      slug={panel.theme.slug}
-      name={panel.theme.name}
-      version={manifest?.version ?? "—"}
-      author={manifest?.author ?? ""}
-      description={manifest?.description ?? "在管理后台创建的自定义主题"}
-      isActive={panel.isActive}
-      hasManifest={panel.hasManifest}
-      appearanceSchema={panel.appearanceSchema}
-      settingsSchema={panel.settingsSchema}
-      widgetAreas={panel.widgetAreas}
-      initialConfig={panel.config}
-      initialSettings={panel.settings}
-    />
+    <>
+      <ThemeSettingsForm
+        slug={panel.theme.slug}
+        name={panel.theme.name}
+        version={manifest?.version ?? "—"}
+        author={manifest?.author ?? ""}
+        description={manifest?.description ?? "在管理后台创建的自定义主题"}
+        isActive={panel.isActive}
+        hasManifest={panel.hasManifest}
+        appearanceSchema={panel.appearanceSchema}
+        settingsSchema={panel.settingsSchema}
+        widgetAreas={panel.widgetAreas}
+        initialConfig={panel.config}
+        initialSettings={panel.settings}
+      />
+
+      {SettingsPanel ? (
+        <div className="mt-6">
+          <SettingsPanel />
+        </div>
+      ) : null}
+    </>
   );
 }

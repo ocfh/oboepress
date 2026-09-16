@@ -81,7 +81,7 @@ export async function getActiveTheme(): Promise<Theme> {
     .select()
     .from(siteSettings)
     .where(eq(siteSettings.id, 1));
-  let slug = settings?.activeThemeSlug || "oboepress-2026";
+  let slug = settings?.activeThemeSlug || "default";
   // If the configured active theme's folder is gone, fall back to a discovered one.
   if (!getThemeManifest(slug)) {
     const discovered = discoverThemes();
@@ -122,7 +122,7 @@ export async function createTheme(input: ThemeInput): Promise<Theme> {
   if (exists) throw new ValidationError("主题标识已存在");
 
   // Scaffold a real, auto-discoverable theme folder from the default template.
-  const tpl = path.join(process.cwd(), "themes", "oboepress-2026");
+  const tpl = path.join(process.cwd(), "themes", "default");
   copyThemeTemplate(tpl, dir, slug, input.name, input.config);
 
   await syncThemes();
@@ -179,7 +179,7 @@ function copyThemeTemplate(
       if (config && Object.keys(config).length) manifest.config = config;
       fs.writeFileSync(d, JSON.stringify(manifest, null, 2));
     } else if (entry.name === "index.ts") {
-      const code = fs.readFileSync(s, "utf-8").replace(/oboepress-2026/g, slug);
+      const code = fs.readFileSync(s, "utf-8").replace(/oboepress-2026|themes\/default/g, slug);
       fs.writeFileSync(d, code);
     } else {
       fs.copyFileSync(s, d);

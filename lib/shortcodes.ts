@@ -1,14 +1,8 @@
 import { applyFilters, HOOKS } from "@/lib/hooks";
 
 /**
- * Shortcode engine — WordPress `[gallery]` / Typecho macro parity.
- *
- * Authors type `[alert type="warn"]小心[/alert]` inside a paragraph or HTML
- * block and the renderer expands it into markup at output time. Plugins and
- * themes register their own tags through the `shortcode.register` filter, so a
- * plugin can add `[my-widget]` without touching the core.
- *
- * Escaping: wrap in double brackets — `[[alert]]` renders the literal text.
+ * WordPress 风格 `[tag]` 宏，输出时展开为标记。插件/主题经
+ * `shortcode.register` 过滤器注册自定义标签；`[[tag]]` 双重括号转义为字面量。
  */
 
 export type ShortcodeAttrs = Record<string, string>;
@@ -60,14 +54,6 @@ function store(): Map<string, ShortcodeDefinition> {
 
 export function registerShortcode(def: ShortcodeDefinition): void {
   store().set(def.name.toLowerCase(), def);
-}
-
-export function unregisterShortcode(name: string): void {
-  store().delete(name.toLowerCase());
-}
-
-export function listShortcodes(): ShortcodeDefinition[] {
-  return [...store().values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -162,11 +148,6 @@ export async function renderShortcodes(
   // Restore escaped literals.
   const restore = new RegExp(`${ESCAPE_TOKEN}([\\s\\S]*?)${ESCAPE_TOKEN}`, "g");
   return out.replace(restore, (_a, body: string) => `[${body}]`);
-}
-
-/** Strip every shortcode — used when building excerpts / plain text. */
-export function stripShortcodes(text: string): string {
-  return text.replace(/\[\/?[\w-]+[^\]]*\]/g, "").trim();
 }
 
 /* -------------------------------------------------------------------------- */

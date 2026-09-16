@@ -44,28 +44,6 @@ export interface CommentConfig {
   utterances: { repo: string; term: string };
 }
 
-export const COMMENT_PROVIDERS: { value: CommentProvider; label: string }[] = [
-  { value: "builtin", label: "系统自带（内置数据库）" },
-  { value: "artalk", label: "Artalk（自建）" },
-  { value: "giscus", label: "Giscus（GitHub 讨论）" },
-  { value: "waline", label: "Waline（valine 继任）" },
-  { value: "twikoo", label: "Twikoo（腾讯云/私有）" },
-  { value: "disqus", label: "Disqus" },
-  { value: "utterances", label: "Utterances（GitHub Issues）" },
-  { value: "none", label: "不显示评论" },
-];
-
-export const AVATAR_SOURCES: { value: AvatarSource; label: string }[] = [
-  { value: "gravatar", label: "Gravatar（国际）" },
-  { value: "cn-gravatar", label: "Gravatar 国内镜像" },
-  { value: "cravatar", label: "Cravatar（酷家）" },
-  { value: "weavatar", label: "WeAvatar" },
-  { value: "libravatar", label: "Libravatar" },
-  { value: "qq", label: "QQ 邮箱 → QQ 头像" },
-  { value: "none", label: "无头像" },
-];
-
-/** Build a CommentConfig from a raw site_settings row. */
 export function resolveCommentConfig(s: Partial<SiteSettings>): CommentConfig {
   return {
     provider: (s.commentProvider as CommentProvider) || "builtin",

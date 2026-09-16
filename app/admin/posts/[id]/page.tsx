@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getPostById } from "@/lib/services/posts";
 import { listCategories, listTags } from "@/lib/services/taxonomies";
+import { getActiveTheme } from "@/lib/services/themes";
+import { collectEditorFields } from "@/lib/editor-fields";
 import ContentEditor from "@/components/ContentEditor";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,8 @@ export default async function EditPost({
   if (session && (session.role === "admin" || session.role === "editor")) {
     authors = await db.select({ id: users.id, name: users.name }).from(users);
   }
+  const activeTheme = await getActiveTheme();
+  const editorFields = await collectEditorFields(activeTheme.slug);
 
   return (
     <ContentEditor
@@ -52,6 +56,7 @@ export default async function EditPost({
       categories={cats}
       tags={tgs}
       authors={authors}
+      editorFields={editorFields}
     />
   );
 }

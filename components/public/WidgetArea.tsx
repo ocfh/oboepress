@@ -6,8 +6,7 @@ import { renderShortcodes, ensureShortcodes } from "@/lib/shortcodes";
  * Renders every widget placed into a theme-declared area.
  *
  * Themes call `<WidgetArea themeSlug={slug} area="sidebar" />` and get whatever
- * the user configured in /admin/widgets — the same contract as nvPress's
- * `register_theme_modules()`, but rendered server-side with no client JS.
+ * the user configured in /admin/widgets, rendered server-side with no client JS.
  */
 
 export default async function WidgetArea({

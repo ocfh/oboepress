@@ -267,7 +267,6 @@ export type PageInput = z.infer<typeof pageInputSchema>;
 export type CategoryInput = z.infer<typeof categoryInputSchema>;
 export type TagInput = z.infer<typeof tagInputSchema>;
 export type UserInput = z.infer<typeof userInputSchema>;
-export type BlockDTO = z.infer<typeof blockSchema>;
 export type SetupInput = z.infer<typeof setupSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type ThemeInput = z.infer<typeof themeInputSchema>;

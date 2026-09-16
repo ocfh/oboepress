@@ -46,7 +46,7 @@ export default async function RootLayout({
   const css = themeToCss(theme.config);
   const themeModule =
     (await loadThemeModule(theme.slug)) ??
-    (await loadThemeModule("oboepress-2026"));
+    (await loadThemeModule("default"));
   // Plugins that ship footer markup (e.g. code-copy) are injected here so they
   // run on every public page regardless of which theme is active.
   const footerHtml = await buildFooterHtml();

@@ -203,6 +203,15 @@ export async function getComment(id: number): Promise<Comment> {
   return row;
 }
 
+/** Public comment count — used by theme "blog stat" widgets. */
+export async function getPublicCommentCount(): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(comments)
+    .where(eq(comments.status, "published"));
+  return Number(rows[0]?.count ?? 0);
+}
+
 export async function updateComment(
   user: SessionUser,
   id: number,

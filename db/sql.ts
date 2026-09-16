@@ -28,7 +28,7 @@ async function main() {
     rows = await client.unsafe(query);
     await client.end();
   } else {
-    const client = new PGlite(process.env.DATABASE_URL || "./.data/oboepress");
+    const client = new PGlite(process.env.DATABASE_URL || "./.data/oboepress_main");
     const result = await client.query(query);
     rows = result.rows;
     await client.close();

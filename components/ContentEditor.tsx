@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, FileDown, FileUp, Eye, ChevronDown, CircleCheck, MessageSquare, Hash, Tag, Search, Plus, Folder } from "lucide-react";
 import BlockEditor from "@/components/BlockEditor";
+import type { ThemeEditorField } from "@/themes/registry";
 import {
   blocksToMarkdown,
   markdownToBlocks,
@@ -44,12 +45,16 @@ export default function ContentEditor({
   categories,
   tags,
   authors,
+  editorFields = {},
 }: {
   kind: "post" | "page";
   initial?: EditorInitial;
   categories: Option[];
   tags: Option[];
   authors?: Option[];
+  /** Theme-provided editor extension fields (keyed by a theme-local id). Only
+   *  the active theme's fields are passed; when empty nothing is rendered. */
+  editorFields?: Record<string, ThemeEditorField>;
 }) {
   const router = useRouter();
   const isNew = !initial;
@@ -78,6 +83,19 @@ export default function ContentEditor({
   const [mdOpen, setMdOpen] = useState(false);
   const [mdText, setMdText] = useState("");
   const [mdMsg, setMdMsg] = useState("");
+
+  // General helper: read/write a postMeta value by key (used by theme editor
+  // extension fields — each theme owns its own key, so no theme is hard-coded).
+  function metaValue(key: string): string | null {
+    return metas.find((m) => m.key === key)?.value ?? null;
+  }
+  function setMetaValue(key: string, value: string | null) {
+    setMetas((arr) => {
+      const others = arr.filter((m) => m.key !== key);
+      if (!value) return others;
+      return [...others, { key, value }];
+    });
+  }
 
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
@@ -332,6 +350,20 @@ export default function ContentEditor({
               placeholder="https://…"
               className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm outline-none focus:border-indigo-500"
             />
+
+            {kind === "post" &&
+              Object.entries(editorFields).map(([key, field]) => {
+                const Mod = field.Component;
+                return (
+                  <div className="mt-3" key={key}>
+                    <Mod
+                      value={metaValue(field.metaKey)}
+                      onChange={(v) => setMetaValue(field.metaKey, v)}
+                      featuredImage={featuredImage || undefined}
+                    />
+                  </div>
+                );
+              })}
 
             {kind === "post" && (
               <>

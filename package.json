@@ -20,7 +20,6 @@
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.2.17",
-    "@tabler/icons-react": "^3.46.0",
     "@vercel/blob": "^0.24.1",
     "bcryptjs": "^2.4.3",
     "clsx": "^2.1.1",

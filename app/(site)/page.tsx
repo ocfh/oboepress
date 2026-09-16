@@ -8,7 +8,7 @@ export default async function HomePage() {
   const themeModule = await loadThemeModule(theme.slug);
 
   if (!themeModule) {
-    const fallback = await loadThemeModule("oboepress-2026");
+    const fallback = await loadThemeModule("default");
     if (fallback) return <fallback.HomePage />;
     return <div>无法加载主题</div>;
   }

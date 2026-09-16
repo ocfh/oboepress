@@ -9,19 +9,15 @@ export type UploadResult = {
 };
 
 /**
- * 用户内容根目录。遵循「核心 / 扩展 / 内容」三分约定（参考 nvPress 的
- * nv-content）：代码升级不触碰 content/，用户上传永不随构建丢失。
+ * content/ 为用户内容根目录，遵循「核心/扩展/内容」三分约定，
+ * 上传不随构建丢失。
  */
 export const CONTENT_DIR = path.join(process.cwd(), "content");
 export const UPLOADS_DIR = path.join(CONTENT_DIR, "uploads");
 
 /**
- * Object storage abstraction.
- *  - Production: Vercel Blob (S3-compatible, edge/CDN served, serverless safe).
- *  - Self-hosted / local: writes to content/uploads and is served by the
- *    /uploads/[...path] route handler (URL shape stays `/uploads/...`).
- *
- * Swap this module for AWS S3 / Cloudflare R2 by changing the `put` call.
+ * Object storage: 生产用 Vercel Blob，自托管写入 content/uploads 并由
+ * /uploads/[...path] 路由提供。换 S3/R2 只需替换下方 put 调用。
  */
 export async function uploadFile(
   file: File,

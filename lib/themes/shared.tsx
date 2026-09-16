@@ -21,7 +21,7 @@ import Comments from "@/components/public/Comments";
 import WidgetArea from "@/components/public/WidgetArea";
 
 /**
- * Shared page engine for the ported nvPress themes.
+ * Shared page engine used by the built-in themes.
  *
  * Every theme reuses these four server components; their *visual identity*
  * comes entirely from the ThemeConfig tokens (--bg, --accent, --radius, …)

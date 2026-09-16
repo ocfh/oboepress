@@ -57,7 +57,7 @@ function createDb(): Database {
   // NOTE: the fallback points at the valid embedded DB. Never fall back to
   // ./data/oboepress — that path was polluted by a native Postgres initdb and
   // is incompatible with pglite (opening it aborts the WASM with "Aborted()").
-  const url = process.env.DATABASE_URL || "./.data/sewpress_main";
+  const url = process.env.DATABASE_URL || "./.data/pglite_live";
   // PGlite's own directory creation is not recursive; make sure the parent
   // data directory exists so the first launch is truly zero-config.
   fs.mkdirSync(path.dirname(path.resolve(url)), { recursive: true });

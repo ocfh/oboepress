@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
+import { ADMIN_ICONS, type AdminMenuItem } from "@/lib/admin-extensions";
 
 const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adminOnly?: boolean; superOnly?: boolean }[] = [
   { href: "/admin", label: "仪表盘", exact: true, icon: LayoutDashboard },
@@ -42,9 +43,11 @@ const STANDALONE = ["/admin/login", "/admin/setup"];
 export default function AdminShell({
   user,
   children,
+  pluginNav = [],
 }: {
   user: SessionUser | null;
   children: React.ReactNode;
+  pluginNav?: AdminMenuItem[];
 }) {
   const pathname = usePathname();
 
@@ -72,6 +75,12 @@ export default function AdminShell({
   }
 
   const visibleNav = NAV.filter((item) => {
+    if (item.superOnly) return user.role === "admin";
+    if (item.adminOnly) return user.role === "admin" || user.role === "editor";
+    return true;
+  });
+
+  const visiblePluginNav = pluginNav.filter((item) => {
     if (item.superOnly) return user.role === "admin";
     if (item.adminOnly) return user.role === "admin" || user.role === "editor";
     return true;
@@ -111,6 +120,34 @@ export default function AdminShell({
               </Link>
             );
           })}
+          {visiblePluginNav.length > 0 && (
+            <>
+              <div className="my-2 border-t border-zinc-800" />
+              {visiblePluginNav.map((item) => {
+                const Icon =
+                  (item.icon && ADMIN_ICONS[item.icon.toLowerCase()]) || undefined;
+                const active = item.exact
+                  ? pathname === item.href
+                  : pathname === item.href || pathname.startsWith(item.href + "/");
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition hover:bg-zinc-800 hover:text-white ${
+                      active ? "bg-zinc-800 text-white" : "text-zinc-300"
+                    }`}
+                  >
+                    {Icon ? (
+                      <Icon size={18} className={active ? "text-indigo-400" : ""} />
+                    ) : (
+                      <span className="inline-block h-2 w-2 rounded-full bg-zinc-600" />
+                    )}
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
         <div className="mt-auto border-t border-zinc-800 pt-4">
           <div className="mb-3 flex items-center gap-3 px-2">

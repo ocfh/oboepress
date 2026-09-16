@@ -17,7 +17,7 @@ import { SchemaForm } from "@/components/SettingsFields";
 import { resolveSettings, type SettingsSchema } from "@/lib/settings-schema";
 
 /**
- * Widget ("小工具" / nvPress "主题模块") placement manager.
+ * Widget ("小工具" / "主题模块") placement manager.
  *
  * Areas come from the active theme's manifest, types from the widget registry
  * plus anything plugins registered via the `widget.types` filter. Each instance

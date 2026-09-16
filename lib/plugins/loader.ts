@@ -5,7 +5,7 @@ import { pluginHasEntry } from "@/lib/plugins/registry";
 /**
  * Plugin loader.
  *
- * Mirrors nvPress's `init-plugins.js`: read the list of enabled plugins, then
+ * Read the list of enabled plugins, then
  * dynamically `import()` each entry file and run its `setup()`. Registrations
  * happen inside `withOwner()` so disabling a plugin can surgically remove them.
  *
@@ -79,7 +79,7 @@ export async function loadPlugins(enabled: EnabledPlugin[]): Promise<void> {
           await withOwner(slug, () => def.setup(ctx));
           s.loaded.set(slug, def);
         } else {
-          // Top-level side-effect style (nvPress function.js parity).
+          // Top-level side-effect style.
           s.loaded.set(slug, { setup: () => {} });
         }
       } catch (err) {

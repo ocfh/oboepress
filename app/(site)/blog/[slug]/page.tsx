@@ -26,7 +26,7 @@ export default async function PostPage({ params }: { params: { slug: string } })
   const decodedSlug = safeDecode(params.slug);
 
   if (!themeModule) {
-    const fallback = await loadThemeModule("oboepress-2026");
+    const fallback = await loadThemeModule("default");
     if (fallback) return <fallback.PostPage params={{ ...params, slug: decodedSlug }} />;
     return <div>无法加载主题</div>;
   }

@@ -13,9 +13,8 @@ import type { Role } from "@/db/schema";
 const COOKIE_NAME = "cms_session";
 const SESSION_DAYS = 7;
 
-// Zero-config local fallback: a per-install random secret is persisted here so
-// sessions survive server restarts without the user setting AUTH_SECRET. The
-// file lives under .data/ which is gitignored and never ships to production.
+// 零配置本地兜底：未设 AUTH_SECRET 时持久化随机密钥，会话跨重启存活；
+// .data/ 已 gitignore、不进生产。
 const DEV_SECRET_PATH = path.resolve(process.cwd(), ".data", ".auth-secret");
 
 export type SessionUser = {
@@ -29,9 +28,8 @@ function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (secret && secret.length >= 16) return new TextEncoder().encode(secret);
 
-  // No explicit AUTH_SECRET: stay zero-config by generating + persisting a
-  // random secret under .data/ (gitignored) so sessions survive restarts.
-  // A warning is logged in production; deployments should still set one.
+  // 未设 AUTH_SECRET 时零配置生成并持久化随机密钥（gitignored），
+  // 生产环境应显式设置以跨实例稳定会话。
   if (process.env.NODE_ENV === "production") {
     console.warn(
       "[oboepress] AUTH_SECRET is not set — using an auto-generated local secret. " +

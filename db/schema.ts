@@ -223,7 +223,7 @@ export const comments = pgTable(
 
 /**
  * Navigation menus. Each row is one "location" (header / footer) holding an
- * ordered, hierarchical list of items. Mirrors nvPress's nav-menu concept.
+ * ordered, hierarchical list of items (header / footer nav).
  */
 export const menus = pgTable("menus", {
   id: serial("id").primaryKey(),
@@ -291,9 +291,9 @@ export const siteSettings = pgTable("site_settings", {
   logoUrl: text("logo_url"),
   faviconUrl: text("favicon_url"),
   // Slug of the theme currently applied to the public site.
-  activeThemeSlug: text("active_theme_slug").notNull().default("oboepress-2026"),
+  activeThemeSlug: text("active_theme_slug").notNull().default("default"),
   footerText: text("footer_text"),
-  // --- Comment settings (mirrors nvPress options) ---
+  // --- Comment settings ---
   commentsEnabled: boolean("comments_enabled").notNull().default(true),
   requireNameEmail: boolean("require_name_email").notNull().default(false),
   commentModeration: boolean("comment_moderation").notNull().default(false),
@@ -369,7 +369,7 @@ export const siteSettings = pgTable("site_settings", {
 export type SocialLink = { label: string; url: string; icon?: string };
 
 /**
- * Generic key/value option store (wp_options / nvPress options.json).
+ * Generic key/value option store.
  * Anything that does not deserve its own column lands here: active plugin list,
  * per-plugin settings, feature flags, cached counters, …
  */
@@ -404,7 +404,7 @@ export const plugins = pgTable(
 );
 
 /**
- * Widgets ("theme modules" in nvPress, "小工具" in WordPress). Each row is one
+ * Widgets ("主题模块" / "小工具"). Each row is one
  * widget instance placed into a named area declared by the active theme.
  */
 export const widgets = pgTable(

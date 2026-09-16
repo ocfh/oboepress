@@ -1,7 +1,7 @@
 import type { SettingsSchema } from "@/lib/settings-schema";
 
 /**
- * Widget registry ("小工具" in WordPress, "theme modules" in nvPress).
+ * Widget registry ("小工具" in WordPress, "theme modules").
  *
  * A widget **type** declares its settings schema and how to fetch its data; a
  * widget **instance** (a row in the `widgets` table) binds a type into a

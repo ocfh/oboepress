@@ -17,7 +17,7 @@ import PostToc from "@/components/public/PostToc";
 import ShareButtons from "@/components/public/ShareButtons";
 import RelatedPosts from "@/components/public/RelatedPosts";
 import WidgetArea from "@/components/public/WidgetArea";
-import { THEME_SLUG } from "@/themes/oboepress-2026";
+import { THEME_SLUG } from "@/themes/default";
 
 export const dynamic = "force-dynamic";
 

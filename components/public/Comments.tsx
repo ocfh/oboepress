@@ -88,7 +88,7 @@ export default function Comments({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Built-in comment system (nvPress-style .comment-list)                       */
+/* Built-in comment system (.comment-list)                                    */
 /* -------------------------------------------------------------------------- */
 
 function avatarStyle(url?: string | null): React.CSSProperties {

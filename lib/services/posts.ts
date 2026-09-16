@@ -41,6 +41,10 @@ export type PostQuery = {
   pinnedFirst?: boolean;
   /** Exclude one post id — used by "related posts". */
   excludeId?: number;
+  /** Sort order: "date" (default) or "views" for most-read lists. */
+  orderBy?: "date" | "views";
+  /** Random order — used by theme "random posts" widgets. */
+  random?: boolean;
   limit?: number;
   offset?: number;
 };
@@ -133,9 +137,13 @@ export async function listPosts(opts: PostQuery = {}): Promise<{
   const where = conditions.length ? and(...conditions) : undefined;
 
   // Sticky posts only make sense on the first page of a listing.
-  const order = opts.pinnedFirst
-    ? [desc(posts.pinned), desc(posts.publishedAt), desc(posts.createdAt)]
-    : [desc(posts.publishedAt), desc(posts.createdAt)];
+  const order = opts.random
+    ? [sql`random()`]
+    : opts.orderBy === "views"
+      ? [desc(posts.views), desc(posts.publishedAt)]
+      : opts.pinnedFirst
+        ? [desc(posts.pinned), desc(posts.publishedAt), desc(posts.createdAt)]
+        : [desc(posts.publishedAt), desc(posts.createdAt)];
 
   const rows = await db
     .select({

@@ -14,6 +14,8 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { getDashboardStats } from "@/lib/services/dashboard";
+import { HOOKS, applyAsyncFilters } from "@/lib/hooks";
+import type { DashboardCardItem } from "@/lib/admin-extensions";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +32,9 @@ const commentStatusLabel: Record<string, string> = {
 
 export default async function Dashboard() {
   const stats = await getDashboardStats();
+  const { cards: pluginCards } = await applyAsyncFilters(HOOKS.dashboardCards, {
+    cards: [] as DashboardCardItem[],
+  });
 
   const cards = [
     { label: "文章", value: stats.counts.posts, href: "/admin/posts", icon: FileText },
@@ -84,6 +89,33 @@ export default async function Dashboard() {
           );
         })}
       </div>
+
+      {pluginCards.length > 0 && (
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {pluginCards.map((card, i) => {
+            const inner = (
+              <div className="group h-full rounded-xl border border-zinc-800 bg-zinc-900 p-5 transition hover:border-indigo-500 hover:bg-zinc-800/40">
+                <p className="text-3xl font-bold">{card.value}</p>
+                <p className="mt-1 text-sm text-zinc-400">{card.label}</p>
+                {card.sub && (
+                  <p className="mt-1 text-xs text-zinc-500">{card.sub}</p>
+                )}
+              </div>
+            );
+            return card.href ? (
+              <Link
+                key={card.label + i}
+                href={card.href}
+                className="block"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div key={card.label + i}>{inner}</div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-10 grid gap-6 lg:grid-cols-2">
         {/* 文章状态分布 */}

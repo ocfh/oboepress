@@ -1,14 +1,9 @@
 import type { PostFormat } from "@/db/schema";
 
 /**
- * Post formats (WordPress「文章形式」/ Tumblr post types).
- *
- * A format is a *presentation hint*, not a content type: the same blocks are
- * stored either way, but themes can render an `aside` as a bare snippet, a
- * `quote` as a pull-quote card, a `link` as a link card, and so on.
- *
- * `extraFields` declares the per-format inputs the editor shows; the values
- * live in `posts.formatMeta` so no schema change is needed to add a format.
+ * 文章形式（WordPress「文章形式」/ Tumblr post types）。形式是*展示提示*而非
+ * 内容类型：数据不变，主题可按形式差异化渲染。extraFields 声明编辑器展示的
+ * 输入，值存于 posts.formatMeta，无需改表即可新增形式。
  */
 
 export type PostFormatDef = {
@@ -108,11 +103,6 @@ export const POST_FORMATS: PostFormatDef[] = [
 
 export function getPostFormat(value: string | null | undefined): PostFormatDef {
   return POST_FORMATS.find((f) => f.value === value) ?? POST_FORMATS[0];
-}
-
-/** Formats whose title the theme should suppress. */
-export function formatHidesTitle(value: string | null | undefined): boolean {
-  return !!getPostFormat(value).hideTitle;
 }
 
 /** Select options for the editor dropdown. */

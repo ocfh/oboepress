@@ -2,15 +2,9 @@ import type { SettingsSchema } from "./settings-schema";
 import { DEFAULT_THEME_CONFIG } from "./theme";
 
 /**
- * The **appearance** half of a theme's admin panel.
- *
- * Every key of `ThemeConfig` is declared here once, so `/admin/themes/[slug]`
- * can render the full design-token editor without any theme-specific React.
- * A theme's own options (hero copy, membership, licence, …) come from its
- * `manifest.settingsSchema` and are appended after these sections.
- *
- * Defaults deliberately reference DEFAULT_THEME_CONFIG so the form and the CSS
- * fallbacks can never drift apart.
+ * 主题「外观」面板的声明式 schema：`ThemeConfig` 每个键声明一次，
+ * 供 /admin/themes/[slug] 渲染设计令牌编辑器。默认值引用
+ * DEFAULT_THEME_CONFIG，表单与 CSS 回退永不漂移。
  */
 const D = DEFAULT_THEME_CONFIG;
 

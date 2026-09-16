@@ -43,7 +43,7 @@ async function main() {
     await migrate(drizzle(client), { migrationsFolder: folder });
     await client.end();
   } else {
-    const url = process.env.DATABASE_URL || "./.data/sewpress_main";
+    const url = process.env.DATABASE_URL || "./.data/oboepress_main";
     const client = new PGlite(url);
     await client.exec(DROP_ALL);
     await migratePglite(drizzlePglite(client), { migrationsFolder: folder });

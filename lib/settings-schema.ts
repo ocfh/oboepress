@@ -1,12 +1,6 @@
 /**
- * Declarative settings schema shared by **plugins** and **themes**.
- *
- * A theme/plugin declares its options as data; the admin renders the form
- * automatically. This is what lets a ported theme expose dozens of options
- * (layout, typography, hero, membership, licence, …) without writing any React.
- *
- * Inspired by nvPress's per-theme Vue settings panels, but data-driven so a
- * single generic renderer covers every theme.
+ * 声明式设置 schema，插件与主题共用：选项声明为数据，admin 用一个通用
+ * 渲染器自动生成表单，移植的主题也能暴露任意多选项而无需写 React。
  */
 
 export type FieldType =
@@ -55,8 +49,7 @@ export interface SettingSection {
 
 export type SettingsSchema = SettingSection[];
 
-/** Collect `{ key: default }` for every field in a schema. */
-export function schemaDefaults(schema: SettingsSchema): Record<string, unknown> {
+function schemaDefaults(schema: SettingsSchema): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const section of schema) {
     for (const field of section.fields) {

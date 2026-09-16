@@ -1,14 +1,9 @@
 import type { SettingsSchema } from "./settings-schema";
 
 /**
- * Declarative schema for the `site_settings` row.
- *
- * Reusing the same schema machinery as plugins/themes means `/admin/settings`
- * is one generic form instead of ~40 hand-written inputs, and every new column
- * only needs a line here.
- *
- * `theme` and `page` select options are injected at runtime by the settings
- * page (it knows the installed themes / published pages).
+ * `site_settings` 行的声明式 schema，复用与插件/主题相同的 schema 机制，
+ * 使 /admin/settings 是单一通用表单。theme/page 相关下拉选项由设置页在
+ * 运行时注入。
  */
 export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
   {
@@ -34,7 +29,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
         key: "activeThemeSlug",
         label: "当前主题",
         type: "select",
-        default: "oboepress-2026",
+        default: "default",
         half: true,
         options: [],
         help: "细节调整请到「主题」页面的设置面板。",
@@ -441,12 +436,3 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
     ],
   },
 ];
-
-/** Keys that must be persisted as integers (or null when blank). */
-export const SITE_SETTINGS_INT_KEYS = [
-  "homePageId",
-  "postsPageId",
-  "postsPerPage",
-  "feedItems",
-  "excerptLength",
-] as const;

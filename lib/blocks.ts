@@ -1,13 +1,7 @@
 /**
- * Block model for the visual editor.
- * Content is stored as an array of typed blocks (similar to WordPress blocks
- * or Sanity portable text) rather than a raw HTML string. This keeps the
- * source of truth structured and lets us render safely to HTML without
- * trusting user-supplied markup.
- *
- * The exception is the `html` block: it intentionally stores raw HTML written
- * by the (trusted) content author. It is rendered verbatim — never escaped —
- * so authors can embed arbitrary markup (iframes, callouts, custom layouts).
+ * Structured editor content: Block[] is the source of truth, rendered safely
+ * to HTML. The `html` block stores raw markup written by the trusted author
+ * and is rendered verbatim (never escaped).
  */
 
 export type Block =
@@ -123,20 +117,8 @@ export function blocksToPlainText(blocks: Block[] | null | undefined): string {
     .join(" ");
 }
 
-export function emptyContent(): Block[] {
-  return [];
-}
-
-/* ----------------------------------------------------------------------------
- * Markdown interoperability
- *
- * The editor stores content as structured `Block[]` (JSON). These two helpers
- * round-trip that structure with Markdown so authors can paste in `.md` from
- * anywhere (GitHub, Notion export, Obsidian) and export back to `.md`.
- *
- * The parser is intentionally dependency-free (no remark/unified) so it stays
- * tiny and works identically on the server and in the browser.
- * -------------------------------------------------------------------------- */
+/* Markdown <-> Block[] round-trip. Dependency-free parser, works on server
+   and client identically. */
 
 let mdSeq = 0;
 function mdId(): string {
@@ -145,11 +127,7 @@ function mdId(): string {
 }
 
 function inlineToText(md: string): string {
-  // We store inline text verbatim; the renderer escapes on output, so leaving
-  // `*em*` / `[link](url)` as-is keeps the source Markdown readable and lets
-  // the HTML renderer show the literal characters. If you later want inline
-  // markdown rendering, expand this function.
-  return md.replace(/ /g, " ");
+  return md.replace(/ /g, " ");
 }
 
 /** Parse a Markdown string into a `Block[]` structure. */

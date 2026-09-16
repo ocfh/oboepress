@@ -20,7 +20,7 @@ async function main() {
     await migrate(db, { migrationsFolder: folder });
     await client.end();
   } else {
-    const client = new PGlite(process.env.DATABASE_URL || "./.data/sewpress_main");
+    const client = new PGlite(process.env.DATABASE_URL || "./.data/oboepress_main");
     const db = drizzlePglite(client);
     await migratePglite(db, { migrationsFolder: folder });
     await client.close();

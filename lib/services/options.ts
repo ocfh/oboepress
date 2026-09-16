@@ -4,7 +4,7 @@ import { options } from "@/db/schema";
 import { ensureBootstrap } from "./bootstrap";
 
 /**
- * Generic key/value option store (wp_options / nvPress options.json).
+ * Generic key/value option store.
  *
  * Values are stored as jsonb so any serialisable shape works. A tiny
  * per-process cache keeps hot reads (feature flags read on every request) from
