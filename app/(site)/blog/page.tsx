@@ -1,12 +1,12 @@
-import { listPosts } from "@/lib/services/posts";
+﻿import { listPosts } from "@/lib/services/posts";
 import { getSettings } from "@/lib/services/settings";
 import { getPublishedCount } from "@/lib/services/archives";
 import { getActiveTheme } from "@/lib/services/themes";
-import PostCard from "@/components/public/PostCard";
-import Sidebar from "@/components/public/Sidebar";
-import Breadcrumb from "@/components/public/Breadcrumb";
-import Pagination from "@/components/public/Pagination";
-import WidgetArea from "@/components/public/WidgetArea";
+import PostCard from "@/components/shared/PostCard";
+import Sidebar from "@/components/shared/Sidebar";
+import Breadcrumb from "@/components/shared/Breadcrumb";
+import Pagination from "@/components/shared/Pagination";
+import WidgetArea from "@/components/shared/WidgetArea";
 import { loadThemeModule } from "@/themes/registry";
 
 export const dynamic = "force-dynamic";

@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { listPosts } from "@/lib/services/posts";
 import { getTagBySlug } from "@/lib/services/taxonomies";
-import PostCard from "@/components/public/PostCard";
-import Sidebar from "@/components/public/Sidebar";
+import PostCard from "@/components/shared/PostCard";
+import Sidebar from "@/components/shared/Sidebar";
 
 export const dynamic = "force-dynamic";
 

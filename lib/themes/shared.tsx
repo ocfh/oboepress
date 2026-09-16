@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Search, User, Calendar, Eye } from "lucide-react";
 import { getSettings } from "@/lib/services/settings";
@@ -10,15 +10,15 @@ import { getThemeSettings, getThemeBySlug } from "@/lib/services/themes";
 import { isOn } from "@/lib/theme";
 import { serializeBlocks } from "@/lib/blocks";
 import { formatDate } from "@/lib/utils";
-import NavTree from "@/components/public/NavTree";
-import Sidebar from "@/components/public/Sidebar";
-import PostCard from "@/components/public/PostCard";
-import Breadcrumb from "@/components/public/Breadcrumb";
-import PostToc from "@/components/public/PostToc";
-import ShareButtons from "@/components/public/ShareButtons";
-import RelatedPosts from "@/components/public/RelatedPosts";
-import Comments from "@/components/public/Comments";
-import WidgetArea from "@/components/public/WidgetArea";
+import NavTree from "@/components/shared/NavTree";
+import Sidebar from "@/components/shared/Sidebar";
+import PostCard from "@/components/shared/PostCard";
+import Breadcrumb from "@/components/shared/Breadcrumb";
+import PostToc from "@/components/shared/PostToc";
+import ShareButtons from "@/components/shared/ShareButtons";
+import RelatedPosts from "@/components/shared/RelatedPosts";
+import Comments from "@/components/shared/Comments";
+import WidgetArea from "@/components/shared/WidgetArea";
 
 /**
  * Shared page engine used by the built-in themes.

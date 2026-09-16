@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Search, ArrowLeft } from "lucide-react";
 import { listPosts } from "@/lib/services/posts";
 import { getActiveTheme } from "@/lib/services/themes";
-import PostCard from "@/components/public/PostCard";
-import Sidebar from "@/components/public/Sidebar";
+import PostCard from "@/components/shared/PostCard";
+import Sidebar from "@/components/shared/Sidebar";
 import { loadThemeModule } from "@/themes/registry";
 
 export const dynamic = "force-dynamic";

@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { MessageCircle, Reply, Send } from "lucide-react";
 import type { CommentConfig } from "@/lib/comments-config";
-import ThirdPartyComments from "@/components/public/comments/CommentProviders";
+import ThirdPartyComments from "@/components/shared/comments/CommentProviders";
 
 type C = {
   id: number;
