@@ -116,6 +116,12 @@ export const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+/** A logged-in user changing their own password (requires current password). */
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(8).max(200),
+});
+
 /** First-run setup: create the initial admin + site identity. */
 export const setupSchema = z.object({
   siteTitle: z.string().min(1).max(120).optional(),

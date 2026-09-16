@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, UserPlus, Trash2, CircleUser } from "lucide-react";
+import { Users, UserPlus, Trash2, CircleUser, KeyRound } from "lucide-react";
 
 type UserItem = {
   id: number;
@@ -60,6 +60,22 @@ export default function UserManager() {
       const d = await res.json().catch(() => ({}));
       setMsg(d.error || "删除失败");
     }
+  }
+
+  async function resetPassword(u: UserItem) {
+    const next = window.prompt(`为 ${u.name}（${u.email}）设置新密码（至少 8 位）`);
+    if (!next) return;
+    if (next.length < 8) {
+      setMsg("密码至少 8 位");
+      return;
+    }
+    const res = await fetch(`/api/users/${u.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: next }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setMsg(res.ok ? "密码已重置 ✓" : d.error || "重置失败");
   }
 
   return (
@@ -149,6 +165,14 @@ export default function UserManager() {
                 <td className="px-4 py-3 text-zinc-400">{u.email}</td>
                 <td className="px-4 py-3 text-indigo-400">{u.role}</td>
                 <td className="px-4 py-3 text-right">
+                  <button
+                    onClick={() => resetPassword(u)}
+                    className="mr-2 inline-flex items-center gap-1 rounded border border-indigo-900 px-2 py-1 text-xs text-indigo-400 hover:bg-indigo-950"
+                    title="重置密码"
+                  >
+                    <KeyRound size={14} />
+                    重置密码
+                  </button>
                   <button
                     onClick={() => remove(u.id)}
                     className="inline-flex items-center gap-1 rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950"

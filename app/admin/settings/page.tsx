@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, Loader2, Save, Settings } from "lucide-react
 import { SectionFields } from "@/components/SettingsFields";
 import { resolveSettings, type SettingsSchema } from "@/lib/settings-schema";
 import { SITE_SETTINGS_SCHEMA } from "@/lib/site-settings-schema";
+import AccountPasswordForm from "@/components/AccountPasswordForm";
 
 /**
  * Site settings — 常规 / 阅读 / SEO / 评论 / 代码注入.
@@ -161,6 +162,13 @@ export default function SettingsPage() {
               setMsg(null);
             }}
           />
+        </div>
+      </div>
+
+      <div className="mt-10 border-t border-zinc-800 pt-8">
+        <div className="max-w-2xl">
+          <p className="mb-3 text-sm text-zinc-400">修改当前管理员登录密码</p>
+          <AccountPasswordForm />
         </div>
       </div>
     </div>

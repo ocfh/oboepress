@@ -122,6 +122,23 @@ export async function updateUser(
   return publicUser(row);
 }
 
+/** Change the current user's own password after verifying the existing one. */
+export async function changeOwnPassword(
+  actor: SessionUser,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ id: number }> {
+  const [target] = await db.select().from(users).where(eq(users.id, actor.id));
+  if (!target) throw new NotFoundError("用户不存在");
+  if (!(await verifyPassword(currentPassword, target.passwordHash)))
+    throw new ValidationError("当前密码不正确");
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
+    .where(eq(users.id, actor.id));
+  return { id: actor.id };
+}
+
 export async function deleteUser(
   actor: SessionUser,
   id: number,

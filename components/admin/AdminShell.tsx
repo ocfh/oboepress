@@ -16,6 +16,7 @@ import {
   Users,
   Plug,
   LayoutGrid,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
@@ -150,7 +151,14 @@ export default function AdminShell({
           )}
         </nav>
         <div className="mt-auto border-t border-zinc-800 pt-4">
-          <div className="mb-3 flex items-center gap-3 px-2">
+          <Link
+            href="/admin/account"
+            className="flex items-center gap-3 rounded-md px-2 py-2 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+          >
+            <UserRound size={16} className={pathname === "/admin/account" ? "text-indigo-400" : ""} />
+            我的账号
+          </Link>
+          <div className="mb-3 mt-1 flex items-center gap-3 px-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-800 text-sm font-semibold text-zinc-200">
               {user.name.slice(0, 1).toUpperCase()}
             </span>
