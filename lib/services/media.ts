@@ -34,10 +34,13 @@ export async function createMediaFromFile(
 ): Promise<Media> {
   if (!can(user.role, "media:upload")) throw new ForbiddenError();
   const result = await uploadFile(file, "media");
+  // 落盘名本身是「时间戳-随机」格式（见 storage.ts）；入库的 filename 也存
+  // 这座文件名而非原始文件名，保证媒体库展示与实际存储对象一致。
+  const storedName = result.url.split("?")[0].split("/").pop() || file.name;
   const [row] = await db
     .insert(media)
     .values({
-      filename: file.name,
+      filename: storedName,
       url: result.url,
       mimeType: result.contentType,
       size: result.size,

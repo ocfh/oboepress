@@ -40,12 +40,21 @@ export const blockSchema = z.union([
 
 export const contentSchema = z.array(blockSchema).default([]);
 
+/** ISO 日期字符串，用于显式指定发布/创建时间（例如历史文章迁移）。 */
+const publishedAtSchema = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), {
+    message: "publishedAt 必须是合法的时间字符串",
+  })
+  .optional();
+
 export const postInputSchema = z.object({
   title: z.string().min(1).max(300),
   slug: z.string().max(200).optional(),
   excerpt: z.string().max(500).optional(),
   content: contentSchema,
   status: z.enum(["draft", "published", "archived"]).optional(),
+  publishedAt: publishedAtSchema,
   featuredImage: z.string().max(500).optional(),
   seoTitle: z.string().max(200).optional(),
   seoDescription: z.string().max(300).optional(),
@@ -72,6 +81,7 @@ export const pageInputSchema = z.object({
   excerpt: z.string().max(500).optional(),
   content: contentSchema,
   status: z.enum(["draft", "published", "archived"]).optional(),
+  publishedAt: publishedAtSchema,
   featuredImage: z.string().max(500).optional(),
   seoTitle: z.string().max(200).optional(),
   seoDescription: z.string().max(300).optional(),

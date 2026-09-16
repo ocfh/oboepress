@@ -121,7 +121,7 @@ export default function ThemeManager() {
                   <p className="truncate font-medium text-zinc-100">{theme.name}</p>
                   <p className="truncate font-mono text-[11px] text-zinc-500">
                     themes/{theme.slug}
-                    {theme.isDefault && " · 内置默认"}
+                    {theme.isDefault && " · 内置"}
                   </p>
                   {theme.active && (
                     <span className="mt-1.5 inline-block rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">

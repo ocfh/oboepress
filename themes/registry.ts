@@ -18,7 +18,7 @@ import type { SettingField, SettingsSchema } from "@/lib/settings-schema";
  * line of admin React — the generic `SettingsFields` renderer handles it.
  */
 
-/** A named slot a theme exposes for widgets ("主题模块" in nvPress). */
+/** A named slot a theme exposes for widgets ("主题模块"). */
 export interface ThemeWidgetArea {
   key: string;
   label: string;
@@ -56,6 +56,20 @@ export interface ThemeManifest {
   supports?: string[];
 }
 
+/**
+ * A field a theme can inject into the post editor. Each field owns its own
+ * postMeta key (exported as `editorMetaKey`) so the shared editors never need
+ * to know a theme's internals.
+ */
+export interface ThemeEditorField {
+  metaKey: string;
+  Component: React.ComponentType<{
+    value: string | null;
+    onChange: (hex: string | null) => void;
+    featuredImage?: string | null;
+  }>;
+}
+
 export interface ThemeModule {
   manifest: ThemeManifest;
   PublicLayout: React.ComponentType<{
@@ -63,6 +77,10 @@ export interface ThemeModule {
     siteTitle: string;
     currentSlug?: string;
   }>;
+  /** Editor extension fields the theme injects (keyed by a theme-local id). */
+  editorFields?: Record<string, ThemeEditorField>;
+  /** Optional extra panel rendered on the theme's own settings page. */
+  settingsPanel?: React.ComponentType;
   HomePage: React.ComponentType;
   PostPage: React.ComponentType<{ params: { slug: string } }>;
   PageBySlug: React.ComponentType<{ params: { slug: string } }>;
@@ -180,6 +198,8 @@ export async function loadThemeModule(slug: string): Promise<ThemeModule | null>
 
     return {
       manifest,
+      editorFields: mod.editorFields,
+      settingsPanel: mod.settingsPanel,
       PublicLayout: mod.PublicLayout,
       HomePage: mod.HomePage,
       PostPage: mod.PostPage,

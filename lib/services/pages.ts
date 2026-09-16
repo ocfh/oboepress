@@ -87,7 +87,11 @@ export async function createPage(user: SessionUser, input: PageInput): Promise<P
       seoDescription: input.seoDescription,
       commentStatus: input.commentStatus ?? "open",
       parentId: input.parentId ?? null,
-      publishedAt: (input.status ?? "draft") === "published" ? new Date() : null,
+      publishedAt: input.publishedAt
+        ? new Date(input.publishedAt)
+        : (input.status ?? "draft") === "published"
+          ? new Date()
+          : null,
     })
     .returning();
   if (input.metas) await setPostMetas(page.id, input.metas);
@@ -111,7 +115,8 @@ export async function updatePage(
     slug = uniqueSlug(base, taken);
   }
   let publishedAt = existing.publishedAt;
-  if (input.status === "published" && !existing.publishedAt)
+  if (input.publishedAt) publishedAt = new Date(input.publishedAt);
+  else if (input.status === "published" && !existing.publishedAt)
     publishedAt = new Date();
 
   await db

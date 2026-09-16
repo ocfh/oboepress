@@ -50,8 +50,9 @@ export async function syncThemes(): Promise<void> {
       .values({ name: m.name, slug: m.slug, isDefault: m.isDefault, config: m.config })
       .onConflictDoUpdate({
         target: themes.slug,
-        // Preserve the user's colour/option tweaks — only refresh the name.
-        set: { name: m.name },
+        // Preserve the user's colour/option tweaks — only refresh the name and
+        // the default flag (which the manifest owns, not the user).
+        set: { name: m.name, isDefault: m.isDefault },
       });
   }
   const rows = await db.select({ slug: themes.slug }).from(themes);

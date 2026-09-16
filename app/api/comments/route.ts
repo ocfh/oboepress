@@ -48,10 +48,15 @@ export async function POST(req: Request) {
       req.headers.get("x-real-ip") ||
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       null;
+    const siteHost =
+      req.headers.get("x-forwarded-host") ||
+      req.headers.get("host") ||
+      new URL(req.url).host;
     const { comment, isPublic } = await createComment({
       ...body.data,
       userId: session?.id ?? null,
       ip,
+      siteHost,
     });
     return ok({ id: comment.id, isPublic, status: comment.status });
   } catch (e) {

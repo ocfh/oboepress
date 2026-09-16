@@ -292,7 +292,11 @@ export async function createPost(user: SessionUser, input: PostInput) {
       seoDescription: input.seoDescription,
       commentStatus: input.commentStatus ?? "open",
       authorId,
-      publishedAt: (input.status ?? "draft") === "published" ? new Date() : null,
+      publishedAt: input.publishedAt
+        ? new Date(input.publishedAt)
+        : (input.status ?? "draft") === "published"
+          ? new Date()
+          : null,
       format: input.format ?? "standard",
       formatMeta: input.formatMeta ?? {},
       pinned: input.pinned ?? false,
@@ -322,9 +326,10 @@ export async function updatePost(
     slug = uniqueSlug(base, taken);
   }
 
-  // recompute publishedAt if transitioning to published
+  // recompute publishedAt if transitioning to published, or the caller passes one explicitly
   let publishedAt = existing.publishedAt;
-  if (input.status === "published" && !existing.publishedAt)
+  if (input.publishedAt) publishedAt = new Date(input.publishedAt);
+  else if (input.status === "published" && !existing.publishedAt)
     publishedAt = new Date();
 
   await db

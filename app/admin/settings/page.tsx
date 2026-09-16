@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2, Save, Settings } from "lucide-react";
+import { AlertCircle, CheckCircle2, KeyRound, Loader2, Save, Settings } from "lucide-react";
 import { SectionFields } from "@/components/SettingsFields";
 import { resolveSettings, type SettingsSchema } from "@/lib/settings-schema";
 import { SITE_SETTINGS_SCHEMA } from "@/lib/site-settings-schema";
@@ -166,9 +166,17 @@ export default function SettingsPage() {
       </div>
 
       <div className="mt-10 border-t border-zinc-800 pt-8">
-        <div className="max-w-2xl">
-          <p className="mb-3 text-sm text-zinc-400">修改当前管理员登录密码</p>
-          <AccountPasswordForm />
+        <div className="max-w-2xl overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+          <div className="flex items-center gap-2 border-b border-zinc-800 px-5 py-4">
+            <KeyRound size={16} className="text-indigo-400" />
+            <h2 className="text-sm font-semibold text-zinc-100">登录密码</h2>
+          </div>
+          <div className="px-5 py-5">
+            <p className="mb-4 text-xs text-zinc-500">
+              修改当前管理员账号的登录密码。需输入当前密码以确认身份。
+            </p>
+            <AccountPasswordForm />
+          </div>
         </div>
       </div>
     </div>

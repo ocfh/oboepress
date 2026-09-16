@@ -19,7 +19,60 @@ export type CommentInput = {
   authorUrl?: string | null;
   content: string;
   ip?: string | null;
+  /** The host the comment was submitted on (used to block the site's own url). */
+  siteHost?: string | null;
 };
+
+function normHost(h: string): string {
+  return h
+    .toLowerCase()
+    .replace(/^[a-z]+:\/\//, "")
+    .split("/")[0]
+    .split("?")[0]
+    .split(":")[0]
+    .replace(/^www\./, "");
+}
+
+/**
+ * Anti-impersonation: guests may not pose as the site owner / admins by using
+ * the admin names, site name, admin email or the site's own url. Logged-in
+ * users post from their own registered account, so they are exempt.
+ */
+async function assertNotImpersonation(input: CommentInput) {
+  if (input.userId != null) return;
+
+  const settings = await getSettings();
+  const admins = await db
+    .select({ name: users.name, email: users.email })
+    .from(users)
+    .where(eq(users.role, "admin"));
+
+  const names = new Set<string>();
+  const emails = new Set<string>();
+  for (const v of [settings.siteTitle, settings.tagline]) {
+    if (v) names.add(String(v).toLowerCase());
+  }
+  for (const a of admins) {
+    if (a.name) names.add(a.name.toLowerCase());
+    if (a.email) emails.add(a.email.toLowerCase());
+  }
+
+  const name = input.authorName?.trim().toLowerCase() ?? "";
+  if (name && names.has(name)) {
+    throw new ForbiddenError("不允许使用管理员或本站身份作为昵称");
+  }
+  const email = input.authorEmail?.trim().toLowerCase() ?? "";
+  if (email && emails.has(email)) {
+    throw new ForbiddenError("不允许使用管理员或本站的邮箱");
+  }
+  if (input.siteHost && input.authorUrl) {
+    const site = normHost(input.siteHost);
+    const url = normHost(input.authorUrl);
+    if (site && url === site) {
+      throw new ForbiddenError("不允许填写本站网址");
+    }
+  }
+}
 
 export type CommentWithMeta = Comment & {
   parentName?: string;
@@ -160,6 +213,9 @@ export async function createComment(input: CommentInput): Promise<{
 
   const haystack = [input.content, authorName, authorEmail ?? "", authorUrl ?? ""].join("\n");
   let status: Comment["status"] = "published";
+
+  await assertNotImpersonation({ ...input, authorName, authorEmail, authorUrl });
+
   if (settings.commentModeration) status = "pending";
   if (triggered(settings.commentModerationWords, haystack)) status = "pending";
 

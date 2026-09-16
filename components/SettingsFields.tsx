@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import {
   isFieldVisible,
   type SettingField,
@@ -188,32 +188,7 @@ export function Field({
       );
 
     case "image":
-      return (
-        <div className="col-span-2">
-          {label}
-          <div className="flex items-start gap-3">
-            {String(value ?? "") && (
-              // Arbitrary user URLs — plain <img> avoids next/image domain config.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={String(value)}
-                alt=""
-                className="h-16 w-16 shrink-0 rounded-md border border-zinc-700 object-cover"
-              />
-            )}
-            <div className="flex-1">
-              <input
-                id={id}
-                value={String(value ?? "")}
-                placeholder={field.placeholder ?? "/uploads/media/... 或 https://..."}
-                onChange={(e) => onChange(e.target.value)}
-                className={inputCls}
-              />
-              {help}
-            </div>
-          </div>
-        </div>
-      );
+      return <ImageField field={field} value={value} onChange={onChange} />;
 
     case "links":
       return <LinksField field={field} value={value} onChange={onChange} />;
@@ -249,6 +224,97 @@ export function Field({
         </div>
       );
   }
+}
+
+function ImageField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const id = `f-${field.key}`;
+
+  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setBusy(true);
+    setErr("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/media", { method: "POST", body: fd });
+      const row = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErr(row.error || "上传失败");
+      } else {
+        onChange(row.url || row.path || row.src || "");
+      }
+    } catch {
+      setErr("上传失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="col-span-2">
+      <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-zinc-400">
+        {field.label}
+      </label>
+      <div className="flex items-start gap-3">
+        {String(value ?? "") && (
+          // Arbitrary user URLs — plain <img> avoids next/image domain config.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={String(value)}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-md border border-zinc-700 object-cover"
+          />
+        )}
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <input
+              id={id}
+              value={String(value ?? "")}
+              placeholder={field.placeholder ?? "/uploads/media/... 或 https://..."}
+              onChange={(e) => onChange(e.target.value)}
+              className={inputCls}
+            />
+            <label className="relative shrink-0 cursor-pointer rounded-md border border-dashed border-zinc-700 px-3 py-2 text-xs text-zinc-400 transition hover:border-indigo-500 hover:text-indigo-400">
+              {busy ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Upload size={14} /> 上传
+                </span>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={upload}
+                disabled={busy}
+                className="sr-only"
+              />
+            </label>
+          </div>
+          {err && <p className="mt-1 text-[11px] text-rose-400">{err}</p>}
+          {field.help ? (
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{field.help}</p>
+          ) : (
+            <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+              可直接粘贴 URL，或点「上传」从本机选择图片。
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LinksField({
