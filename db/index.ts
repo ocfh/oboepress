@@ -3,6 +3,7 @@ import path from "node:path";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
+import { migrate as migratePostgres } from "drizzle-orm/postgres-js/migrator";
 import { PGlite } from "@electric-sql/pglite";
 import postgres from "postgres";
 import * as schema from "./schema";
@@ -80,9 +81,13 @@ function getDb(): Database {
  * this makes startup truly zero-config: the first request opens the embedded
  * DB and creates every table automatically (no `db:migrate` step required).
  *
- * For the postgres driver we deliberately do NOT auto-migrate at runtime — in
- * serverless that would race across instances. Production applies migrations
- * via `npm run db:migrate` in the deploy pipeline (see .env.example).
+ * For the postgres driver we auto-migrate too, so the first request against a
+ * fresh remote database (e.g. Neon on a first Vercel deploy) creates every
+ * table without needing to run `npm run db:migrate` manually. Migrations are
+ * idempotent — drizzle records each applied migration in `__drizzle_migrations`
+ * and skips those already run — so concurrent serverless instances that both
+ * hit the empty schema just apply the same changes safely. Schema changes
+ * after the first deploy are still best applied via `npm run db:migrate`.
  *
  * The promise is cached on globalThis so concurrent first requests coalesce
  * into a single migration run (important under Next dev hot-reload).
@@ -91,11 +96,14 @@ export function ensureMigrations(): Promise<void> {
   if (!globalForDb.__oboeMigrated) {
     globalForDb.__oboeMigrated = (async () => {
       getDb(); // ensure client + driver are initialised
-      // Only the embedded local driver auto-migrates on first launch.
-      if (driver !== "pglite" || !pgliteClient) return;
       const folder = path.resolve(process.cwd(), "db/migrations");
-      const pg = drizzlePglite(pgliteClient, { schema });
-      await migratePglite(pg, { migrationsFolder: folder });
+      if (driver === "postgres" && postgresClient) {
+        const pg = drizzle(postgresClient, { schema });
+        await migratePostgres(pg, { migrationsFolder: folder });
+      } else if (pgliteClient) {
+        const pg = drizzlePglite(pgliteClient, { schema });
+        await migratePglite(pg, { migrationsFolder: folder });
+      }
     })().catch((err) => {
       // Reset so a later request can retry instead of caching the failure.
       globalForDb.__oboeMigrated = undefined;

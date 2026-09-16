@@ -54,5 +54,12 @@ export function authorize(
 export function handleError(e: unknown): NextResponse {
   if (e instanceof ServiceError) return fail(e.message, e.status);
   console.error(e);
+  // When DEBUG_API_ERRORS=true, surface the real message instead of a generic
+  // placeholder so remote-deployment DB/network failures are easy to read
+  // from the API body. Off by default so no stack detail leaks in production.
+  if (process.env.DEBUG_API_ERRORS === "true") {
+    const detail = e instanceof Error ? e.message : String(e);
+    return fail(`服务器内部错误: ${detail}`, 500);
+  }
   return fail("服务器内部错误", 500);
 }
