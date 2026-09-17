@@ -296,6 +296,17 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
 .comment-form .btn-submit:disabled{ opacity:.6; cursor:default; }
 .sf-comment-close{ color:var(--muted); font-size:14px; padding:8px 0; }
 
+/* Logged-in account bar shown above the comment box (guest inputs hidden) */
+.sf-comment-me{ display:flex; align-items:center; gap:10px; margin:0 0 10px; width:fit-content; max-width:100%; }
+.sf-comment-me-avatar{
+  width:34px; height:34px; border-radius:50%; flex-shrink:0;
+  display:inline-flex; align-items:center; justify-content:center;
+  background:var(--accent); color:var(--accent-text, #fff); font-size:15px; font-weight:600;
+}
+.sf-comment-me-meta{ display:flex; flex-direction:column; min-width:0; }
+.sf-comment-me-name{ font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sf-comment-me-email{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
 /* Emoji picker — ported from the reference comment form. Anchored to the
    .funcs row; generic tokens keep it usable in every theme. */
 .comment-form .funcs button.is-active{ color:var(--accent); }

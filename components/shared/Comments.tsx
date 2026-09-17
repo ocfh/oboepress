@@ -123,6 +123,7 @@ function BuiltinComments({
   defaultContent?: string;
 }) {
   const [tree, setTree] = useState<C[]>([]);
+  const [me, setMe] = useState<{ id: number; name: string; email: string } | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [url, setUrl] = useState("");
@@ -187,6 +188,17 @@ function BuiltinComments({
     load();
   }, [load]);
 
+  // Logged-in identity: guest name/email inputs are hidden and the server
+  // stamps the comment with the account identity (see createComment).
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) =>
+        setMe(d?.user ? { id: d.user.id, name: d.user.name, email: d.user.email } : null),
+      )
+      .catch(() => setMe(null));
+  }, []);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setNotice("");
@@ -194,15 +206,15 @@ function BuiltinComments({
       setNotice("请填写评论内容！");
       return;
     }
-    if (requireNameEmail && !name.trim()) {
+    if (!me && requireNameEmail && !name.trim()) {
       setNotice("昵称必填！");
       return;
     }
-    if (requireNameEmail && !email.trim()) {
+    if (!me && requireNameEmail && !email.trim()) {
       setNotice("邮箱必填！");
       return;
     }
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!me && email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setNotice("请输入正确的邮箱格式！");
       return;
     }
@@ -289,6 +301,15 @@ function BuiltinComments({
       {notice && <div className="sf-comment-close" style={{ color: "var(--primary-color)" }}>{notice}</div>}
 
       <form onSubmit={submit} className="comment-form sf-comment-form my-5" noValidate>
+        {me && (
+          <div className="sf-comment-me">
+            <span className="sf-comment-me-avatar">{me.name.charAt(0).toUpperCase()}</span>
+            <span className="sf-comment-me-meta">
+              <span className="sf-comment-me-name">{me.name}</span>
+              <span className="sf-comment-me-email">{me.email}</span>
+            </span>
+          </div>
+        )}
         <div className={"input" + (focusCount > 0 ? " is_focused" : "")}>
           <textarea
             ref={taRef}
@@ -317,6 +338,7 @@ function BuiltinComments({
           </button>
           {showEmoji && <EmojiPanel onSelect={insertEmoji} />}
         </div>
+        {!me && (
         <div className="guest-info fields flex gx-3 mx-5">
           <div className="item">
             <input
@@ -355,6 +377,7 @@ function BuiltinComments({
             <i><LinkIcon size={15} /></i>
           </div>
         </div>
+        )}
         <div className="mt-5 form-actions text-right">
           {replyTo != null && (
             <button type="button" className="cancel" onClick={() => setReplyTo(null)}>

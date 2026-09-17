@@ -76,7 +76,10 @@ async function runBootstrap(): Promise<void> {
     {
       location: "header",
       name: "顶部导航",
-      items: [{ label: "首页", url: "/", order: 1 }],
+      // every reference-site top-nav item ships a glyph with margin-right:6px.
+      // "house" (not "home"): lucide renamed Home → House, and CatIcon silently
+      // renders null for names outside the icon-names whitelist.
+      items: [{ label: "首页", url: "/", order: 1, icon: "house" }],
     },
     {
       location: "footer",
@@ -93,7 +96,13 @@ async function runBootstrap(): Promise<void> {
       .returning();
     if (row && m.items.length) {
       await db.insert(menuItems).values(
-        m.items.map((it) => ({ menuId: row.id, label: it.label, url: it.url, order: it.order })),
+        m.items.map((it) => ({
+          menuId: row.id,
+          label: it.label,
+          url: it.url,
+          order: it.order,
+          icon: "icon" in it ? (it.icon ?? null) : null,
+        })),
       );
     }
   }
