@@ -1,19 +1,29 @@
 ﻿"use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { MessageCircle, Reply, Send } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Smile, User, Mail, Link as LinkIcon, RotateCcw, Reply, Send } from "lucide-react";
 import type { CommentConfig } from "@/lib/comments-config";
 import ThirdPartyComments from "@/components/shared/comments/CommentProviders";
+import EmojiPanel from "@/components/shared/comments/EmojiPanel";
 
 type C = {
   id: number;
   parentId: number | null;
   authorName: string;
+  authorUrl?: string | null;
   content: string;
   createdAt: string;
   avatarUrl?: string | null;
   children: C[];
 };
+
+/** Only allow http(s) homepage links so stored URLs can't inject schemes. */
+function safeUrl(u?: string | null): string | null {
+  if (!u) return null;
+  const t = u.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return null;
+}
 
 function buildTree(flat: C[]): C[] {
   const byId = new Map<number, C>();
@@ -40,7 +50,9 @@ async function loadConfig(): Promise<CommentConfig | null> {
 function fmtDate(v?: string): string {
   if (!v) return "";
   const d = new Date(v);
-  return Number.isNaN(d.getTime()) ? "" : `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+  if (Number.isNaN(d.getTime())) return "";
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 const DFLT_AVATAR = "linear-gradient(135deg,#dce8f7,#bcd6f3)";
@@ -82,7 +94,7 @@ export default function Comments({
       postType={postType}
       open={open}
       requireNameEmail={requireNameEmail}
-      avatarSize={cfg.avatar.size}
+      defaultContent={cfg.defaultContent}
     />
   );
 }
@@ -102,22 +114,68 @@ function BuiltinComments({
   postType,
   open,
   requireNameEmail,
-  avatarSize,
+  defaultContent,
 }: {
   postId: number;
   postType: string;
   open: boolean;
   requireNameEmail: boolean;
-  avatarSize: number;
+  defaultContent?: string;
 }) {
   const [tree, setTree] = useState<C[]>([]);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [url, setUrl] = useState("");
-  const [content, setContent] = useState("");
+  const [content, setContent] = useState(defaultContent ?? "");
   const [replyTo, setReplyTo] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  // Reference behaviour: the .input box highlights while ANY form field is
+  // focused (textarea + the three guest inputs increment one counter).
+  const [focusCount, setFocusCount] = useState(0);
+  const bindFocus = {
+    onFocus: () => setFocusCount((v) => v + 1),
+    onBlur: () => setFocusCount((v) => Math.max(0, v - 1)),
+  };
+
+  // Emoji picker: remember the textarea selection so emoji land at the caret
+  // even though the panel steals interaction. Never-focused => append at end,
+  // same as the reference component.
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  const funcsRef = useRef<HTMLDivElement>(null);
+  const selRef = useRef<[number, number] | null>(null);
+  const [showEmoji, setShowEmoji] = useState(false);
+
+  const rememberSel = () => {
+    const ta = taRef.current;
+    if (ta) selRef.current = [ta.selectionStart, ta.selectionEnd];
+  };
+
+  function insertEmoji(emoji: string) {
+    const ta = taRef.current;
+    let [start, end] = selRef.current ?? [content.length, content.length];
+    if (ta && document.activeElement === ta) {
+      start = ta.selectionStart;
+      end = ta.selectionEnd;
+    }
+    setContent(content.slice(0, start) + emoji + content.slice(end));
+    const pos = start + emoji.length;
+    selRef.current = [pos, pos];
+    setShowEmoji(false);
+    requestAnimationFrame(() => {
+      ta?.focus();
+      if (ta) ta.selectionStart = ta.selectionEnd = pos;
+    });
+  }
+
+  useEffect(() => {
+    if (!showEmoji) return;
+    const onDown = (e: MouseEvent) => {
+      if (!funcsRef.current?.contains(e.target as Node)) setShowEmoji(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [showEmoji]);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/comments?post=${postId}&postType=${postType}`);
@@ -132,8 +190,20 @@ function BuiltinComments({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setNotice("");
-    if (requireNameEmail && (!name.trim() || !email.trim())) {
-      setNotice("请填写昵称与邮箱");
+    if (!content.trim()) {
+      setNotice("请填写评论内容！");
+      return;
+    }
+    if (requireNameEmail && !name.trim()) {
+      setNotice("昵称必填！");
+      return;
+    }
+    if (requireNameEmail && !email.trim()) {
+      setNotice("邮箱必填！");
+      return;
+    }
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setNotice("请输入正确的邮箱格式！");
       return;
     }
     setBusy(true);
@@ -171,21 +241,28 @@ function BuiltinComments({
             <div className="wrapper flex">
               <div
                 className="avatar relative flex-shrink-0"
-                style={{ ...avatarStyle(n.avatarUrl), width: avatarSize, height: avatarSize }}
+                style={avatarStyle(n.avatarUrl)}
               >
                 <div className="highlight"></div>
               </div>
               <div className="body flex-grow">
                 <div className="flex items-start">
                   <div className="flex-grow flex items-center justify-between info">
-                    <div className="name">{n.authorName}</div>
+                    {safeUrl(n.authorUrl) ? (
+                      <div className="name has-url">
+                        <a href={safeUrl(n.authorUrl)!} target="_blank" rel="nofollow noopener noreferrer">
+                          {n.authorName}
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="name"><span>{n.authorName}</span></div>
+                    )}
                     <div className="date">{fmtDate(n.createdAt)}</div>
                   </div>
                   {open && (
                     <span>
-                      <div className="reply flex items-center" onClick={() => setReplyTo(n.id)} title="回复">
-                        <Reply size={12} />
-                        <span className="reply-label">回复</span>
+                      <div className="flex-shrink-0 reply flex items-center" onClick={() => setReplyTo(n.id)} title="回复">
+                        <Reply size={13} />
                       </div>
                     </span>
                   )}
@@ -211,52 +288,85 @@ function BuiltinComments({
     <div>
       {notice && <div className="sf-comment-close" style={{ color: "var(--primary-color)" }}>{notice}</div>}
 
-      {replyTo != null && (
-        <div className="sf-comment-close" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          回复中…
+      <form onSubmit={submit} className="comment-form sf-comment-form my-5" noValidate>
+        <div className={"input" + (focusCount > 0 ? " is_focused" : "")}>
+          <textarea
+            ref={taRef}
+            {...bindFocus}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onSelect={rememberSel}
+            onKeyUp={rememberSel}
+            onClick={rememberSel}
+            onBlur={() => {
+              rememberSel();
+              setFocusCount((v) => Math.max(0, v - 1));
+            }}
+            placeholder="请输入..."
+          />
+        </div>
+        <div className="funcs mx-5" ref={funcsRef}>
           <button
-            onClick={() => setReplyTo(null)}
-            className="reply flex items-center"
-            style={{ border: "none", marginTop: 0 }}
+            type="button"
+            aria-label="表情"
+            title="表情"
+            className={showEmoji ? "is-active" : ""}
+            onClick={() => setShowEmoji((v) => !v)}
           >
-            <Reply size={12} />
-            <span className="reply-label">取消回复</span>
+            <Smile size={18} />
+          </button>
+          {showEmoji && <EmojiPanel onSelect={insertEmoji} />}
+        </div>
+        <div className="guest-info fields flex gx-3 mx-5">
+          <div className="item">
+            <input
+              {...bindFocus}
+              type="text"
+              className="comment-field"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={`昵称${requireNameEmail ? " *" : ""}`}
+              autoComplete="nickname"
+            />
+            <i><User size={15} /></i>
+          </div>
+          <div className="item">
+            <input
+              {...bindFocus}
+              type="email"
+              className="comment-field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder={`邮箱${requireNameEmail ? " *" : ""}`}
+              autoComplete="email"
+            />
+            <i><Mail size={15} /></i>
+          </div>
+          <div className="item">
+            <input
+              {...bindFocus}
+              type="url"
+              className="comment-field"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="个人首页"
+              autoComplete="url"
+            />
+            <i><LinkIcon size={15} /></i>
+          </div>
+        </div>
+        <div className="mt-5 form-actions text-right">
+          {replyTo != null && (
+            <button type="button" className="cancel" onClick={() => setReplyTo(null)}>
+              <RotateCcw size={12} />
+              取消回复
+            </button>
+          )}
+          <button type="submit" disabled={busy} className="btn-submit">
+            <Send size={13} />
+            {busy ? "提交中…" : replyTo != null ? "回复评论" : "发表评论"}
           </button>
         </div>
-      )}
-
-      <form onSubmit={submit} className="sf-comment-form">
-        <div className="fields">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="昵称"
-            className="comment-field"
-          />
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="邮箱"
-            className="comment-field"
-          />
-          <input
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="网站（可选）"
-            className="comment-field"
-          />
-        </div>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="说点什么…"
-          rows={4}
-          required
-        />
-        <button type="submit" disabled={busy} className="btn-submit">
-          <Send size={15} />
-          {busy ? "提交中…" : "发表评论"}
-        </button>
       </form>
 
       {tree.length === 0 ? (

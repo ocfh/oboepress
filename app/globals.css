@@ -217,3 +217,126 @@ html:not(.is-mac)::-webkit-scrollbar,
 html:not(.is-mac) *::-webkit-scrollbar{ width:6px; height:6px; background-color:transparent; }
 html:not(.is-mac)::-webkit-scrollbar-thumb,
 html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
+
+/* ===========================================================================
+   Built-in comment form — shared structural baseline
+   Markup: components/shared/Comments.tsx (.comment-form). Selectors stay
+   low-specificity on purpose: bluemix / codeman / pseudolinear ship their own
+   higher-specificity overrides; this block only guarantees a usable,
+   reference-style (bordered .input box, icon guest row, right-aligned submit)
+   form in themes without form CSS — default / skyscraper / oboepress-2032 —
+   using the generic theme tokens (--surface, --border, --accent, …).
+   =========================================================================== */
+.comment-form{ display:block; margin:20px 0; }
+.comment-form .input{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.comment-form .input:hover{ border-color:var(--accent); }
+.comment-form .input.is_focused{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.comment-form textarea{
+  display:block; width:100%; height:7em;
+  padding:12px 16px; font-size:16px; font-family:inherit; line-height:1.6;
+  resize:vertical; outline:none; border:0; background:transparent;
+  color:var(--text);
+}
+.comment-form textarea::placeholder{ color:var(--muted); }
+.comment-form .funcs{ display:flex; margin-top:8px; position:relative; }
+.comment-form .funcs button{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:32px; padding:0; border:0; cursor:pointer;
+  background:transparent; color:var(--muted); transition:color .15s ease;
+}
+.comment-form .funcs button:hover{ color:var(--accent); }
+.comment-form .guest-info{ display:flex; gap:8px; }
+.comment-form .guest-info .item{ position:relative; flex:1 1 0; min-width:0; }
+.comment-form .comment-field{
+  width:100%; height:40px; padding:0 12px 0 36px;
+  font-size:15px; font-family:inherit; outline:none;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.comment-form .comment-field:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.comment-form .comment-field::placeholder{ color:var(--muted); }
+.comment-form .guest-info .item i{
+  position:absolute; left:0; top:0; bottom:0; width:36px;
+  display:flex; align-items:center; justify-content:center;
+  font-style:normal; pointer-events:none; color:var(--muted);
+}
+.comment-form .comment-field:focus + i{ color:var(--accent); }
+@media (max-width:650.5px){
+  .comment-form .guest-info{ flex-direction:column; }
+}
+.comment-form .form-actions{
+  display:flex; justify-content:flex-end; align-items:center; gap:8px;
+}
+.comment-form .cancel{
+  display:inline-flex; align-items:center; gap:4px;
+  padding:8px 10px; border:0; background:transparent; cursor:pointer;
+  font-size:14px; font-family:inherit; color:var(--muted);
+}
+.comment-form .cancel:hover{ color:var(--text); }
+.comment-form .btn-submit{
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:9px 18px; border:0; border-radius:var(--radius);
+  background:var(--accent); color:var(--accent-text, #fff);
+  font-size:14px; font-weight:600; font-family:inherit; cursor:pointer;
+  transition:filter .15s ease;
+}
+.comment-form .btn-submit:hover{ filter:brightness(1.08); }
+.comment-form .btn-submit:disabled{ opacity:.6; cursor:default; }
+.sf-comment-close{ color:var(--muted); font-size:14px; padding:8px 0; }
+
+/* Emoji picker — ported from the reference comment form. Anchored to the
+   .funcs row; generic tokens keep it usable in every theme. */
+.comment-form .funcs button.is-active{ color:var(--accent); }
+.emoji-panel{
+  position:absolute; left:0; top:calc(100% + 6px); z-index:30;
+  width:290px; display:flex; flex-direction:column;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  box-shadow:0 12px 32px -12px rgba(0,0,0,.55);
+}
+.emoji-panel .panel{ height:252px; overflow-y:auto; scroll-behavior:smooth; position:relative; }
+.emoji-panel .title{
+  position:sticky; top:0; z-index:1;
+  margin:6px; padding:4px 10px; border-radius:6px;
+  font-size:13px; color:var(--accent);
+  background:color-mix(in srgb, var(--accent) 12%, var(--surface));
+  border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.emoji-panel .emoji-grid{ display:grid; grid-template-columns:repeat(7, 1fr); }
+.emoji-panel .emoji{
+  height:38px; padding:0; border:0; cursor:pointer;
+  font-size:20px; line-height:1; background:transparent; border-radius:6px;
+  transition:background .15s ease;
+}
+.emoji-panel .emoji:hover{ background:color-mix(in srgb, var(--accent) 14%, transparent); }
+.emoji-panel .tabs{ display:flex; border-top:1px solid var(--border); }
+.emoji-panel .tabs button{
+  flex:1; padding:8px 0; font-size:19px; line-height:1; color:var(--text);
+  border:0; background:transparent; cursor:pointer;
+  opacity:.45; filter:grayscale(1); position:relative;
+  transition:opacity .2s ease, filter .2s ease;
+}
+.emoji-panel .tabs button:hover{ opacity:1; filter:none; }
+.emoji-panel .tabs button.active{
+  opacity:1; filter:none; box-shadow:inset 0 -2px var(--accent);
+}
+.emoji-panel .tabs button.active::before{
+  content:""; position:absolute; top:-1px; left:calc(50% - 4px);
+  border-top:4px solid var(--accent);
+  border-left:4px solid transparent; border-right:4px solid transparent;
+}
+@media (max-width:650.5px){
+  .emoji-panel{ width:min(290px, calc(100vw - 48px)); }
+}

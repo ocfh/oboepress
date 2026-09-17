@@ -22,6 +22,8 @@ export interface CommentConfig {
   provider: CommentProvider;
   /** Global master switch (site_settings.comments_enabled). */
   enabled: boolean;
+  /** Text prefilled in the built-in comment box. */
+  defaultContent: string;
   avatar: {
     source: AvatarSource;
     size: number;
@@ -48,6 +50,7 @@ export function resolveCommentConfig(s: Partial<SiteSettings>): CommentConfig {
   return {
     provider: (s.commentProvider as CommentProvider) || "builtin",
     enabled: s.commentsEnabled ?? true,
+    defaultContent: s.commentDefaultContent || "",
     avatar: {
       source: (s.avatarSource as AvatarSource) || "gravatar",
       size: s.avatarSize ?? 80,

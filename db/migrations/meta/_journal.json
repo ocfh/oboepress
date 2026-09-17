@@ -43,6 +43,41 @@
       "when": 1789574400000,
       "tag": "0005_category_icon",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789620000000,
+      "tag": "0006_comment_default_content",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789690000000,
+      "tag": "0007_footer_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789750000000,
+      "tag": "0008_post_likes",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789840000000,
+      "tag": "0009_menu_item_icon",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789841000000,
+      "tag": "0010_reconcile_comment_counts",
+      "breakpoints": true
     }
   ]
 }

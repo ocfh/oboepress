@@ -2,14 +2,19 @@ import Link from "next/link";
 import { Search, Folder, Tags, Clock } from "lucide-react";
 import { listCategories, listTags } from "@/lib/services/taxonomies";
 import { listPosts } from "@/lib/services/posts";
+import { getActiveThemeSettings } from "@/lib/services/themes";
 import { formatDate } from "@/lib/utils";
+import ServerIcon from "@/components/shared/ServerIcon";
 
 export default async function Sidebar() {
-  const [cats, tags, recent] = await Promise.all([
+  const [cats, tags, recent, ts] = await Promise.all([
     listCategories(),
     listTags(),
     listPosts({ status: "published", limit: 5 }),
+    getActiveThemeSettings(),
   ]);
+  // 仅当主题显式开启「获取自定义图标」时，侧栏分类才显示配置的图标。
+  const showCatIcons = ts.useCustomIcons === true;
 
   return (
     <aside className="space-y-6">
@@ -35,7 +40,13 @@ export default async function Sidebar() {
         <ul className="space-y-1 text-sm">
           {cats.map((c) => (
             <li key={c.id}>
-              <Link href={`/blog/category/${c.slug}`} className="text-zinc-300 hover:text-[var(--accent)]">
+              <Link
+                href={`/blog/category/${c.slug}`}
+                className="flex items-center gap-1.5 text-zinc-300 hover:text-[var(--accent)]"
+              >
+                {showCatIcons ? (
+                  <ServerIcon name={c.icon} size={14} className="text-[var(--accent)]" />
+                ) : null}
                 {c.name}
               </Link>
             </li>

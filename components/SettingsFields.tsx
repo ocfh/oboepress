@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, Loader2, Plus, Trash2, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  Loader2,
+  Plus,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import {
   isFieldVisible,
   type SettingField,
@@ -193,6 +201,12 @@ export function Field({
     case "links":
       return <LinksField field={field} value={value} onChange={onChange} />;
 
+    case "footerLinks":
+      return <FooterLinksField field={field} value={value} onChange={onChange} />;
+
+    case "categoryRows":
+      return <CategoryRowsField field={field} value={value} onChange={onChange} />;
+
     case "font":
       return (
         <div className="col-span-2">
@@ -375,6 +389,213 @@ function LinksField({
         <Plus size={13} /> 添加一项
       </button>
       {field.help && <p className="mt-1 text-[11px] text-zinc-500">{field.help}</p>}
+    </div>
+  );
+}
+
+/**
+ * Repeatable footer-link editor mirroring the reference site's footer_links:
+ * each row is link text (HTML allowed), URL, and an optional 16px icon URL.
+ */
+function FooterLinksField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const items = Array.isArray(value)
+    ? (value as { text?: string; url?: string; image?: string }[])
+    : [];
+  const update = (i: number, patch: Partial<{ text: string; url: string; image: string }>) => {
+    const next = items.map((it, idx) => (idx === i ? { ...it, ...patch } : it));
+    onChange(next);
+  };
+  return (
+    <div className="col-span-2">
+      <p className="mb-1.5 text-xs font-medium text-zinc-400">{field.label}</p>
+      <div className="space-y-2">
+        {items.map((it, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <input
+              value={it.text ?? ""}
+              placeholder="文字（支持 HTML）"
+              onChange={(e) => update(i, { text: e.target.value })}
+              className={inputCls + " w-44 shrink-0"}
+            />
+            <input
+              value={it.url ?? ""}
+              placeholder="https://"
+              onChange={(e) => update(i, { url: e.target.value })}
+              className={inputCls}
+            />
+            <input
+              value={it.image ?? ""}
+              placeholder="图标 URL（可选）"
+              onChange={(e) => update(i, { image: e.target.value })}
+              className={inputCls + " w-44 shrink-0"}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, idx) => idx !== i))}
+              className="shrink-0 rounded-md border border-zinc-700 p-2 text-zinc-400 transition hover:border-rose-500 hover:text-rose-400"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange([...items, { text: "", url: "", image: "" }])}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-dashed border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-indigo-500 hover:text-indigo-400"
+      >
+        <Plus size={13} /> 添加一项
+      </button>
+      {field.help && <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{field.help}</p>}
+    </div>
+  );
+}
+
+/**
+ * Repeatable homepage category-section editor: each row picks a category and
+ * an optional title override; rows can be reordered (render order on the
+ * homepage follows the list order). Categories load from the public API.
+ */
+function CategoryRowsField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const [cats, setCats] = useState<{ id: number; name: string; slug: string }[] | null>(null);
+  const [loadErr, setLoadErr] = useState("");
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("分类加载失败"))))
+      .then((data) => {
+        if (!alive) return;
+        setCats(Array.isArray(data) ? data : []);
+      })
+      .catch((e: Error) => {
+        if (alive) setLoadErr(e.message);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const rows: { slug?: string; title?: string }[] = Array.isArray(value) ? value : [];
+
+  const update = (i: number, patch: Partial<{ slug: string; title: string }>) => {
+    onChange(rows.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+  };
+  const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[j]] = [next[j], next[i]];
+    onChange(next);
+  };
+  const add = () => {
+    const used = new Set(rows.map((r) => r.slug));
+    const first = (cats ?? []).find((c) => !used.has(c.slug));
+    onChange([...rows, { slug: first?.slug ?? "", title: "" }]);
+  };
+
+  const iconBtn =
+    "shrink-0 rounded-md border border-zinc-700 p-2 text-zinc-400 transition hover:border-indigo-500 hover:text-indigo-400 disabled:opacity-30 disabled:hover:border-zinc-700 disabled:hover:text-zinc-400";
+
+  return (
+    <div className="col-span-2">
+      <p className="mb-1.5 text-xs font-medium text-zinc-400">{field.label}</p>
+      <div className="space-y-2">
+        {rows.map((it, i) => {
+          const missing = !!it.slug && cats && !cats.some((c) => c.slug === it.slug);
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <div className="flex shrink-0 flex-col">
+                <button
+                  type="button"
+                  title="上移"
+                  onClick={() => move(i, -1)}
+                  disabled={i === 0}
+                  className={`${iconBtn} !p-1`}
+                >
+                  <ArrowUp size={13} />
+                </button>
+                <button
+                  type="button"
+                  title="下移"
+                  onClick={() => move(i, 1)}
+                  disabled={i === rows.length - 1}
+                  className={`${iconBtn} !p-1`}
+                >
+                  <ArrowDown size={13} />
+                </button>
+              </div>
+              <div className="relative flex-1">
+                <select
+                  value={it.slug ?? ""}
+                  onChange={(e) => update(i, { slug: e.target.value })}
+                  className={inputCls + " appearance-none pr-8" + (missing ? " border-rose-600" : "")}
+                >
+                  <option value="">— 选择分类 —</option>
+                  {(cats ?? []).map((c) => (
+                    <option key={c.id} value={c.slug}>
+                      {c.name}
+                    </option>
+                  ))}
+                  {missing && <option value={it.slug}>{it.slug}（已删除）</option>}
+                </select>
+                <ChevronDown
+                  size={14}
+                  className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500"
+                />
+              </div>
+              <input
+                value={it.title ?? ""}
+                placeholder="标题留空则用分类名"
+                onChange={(e) => update(i, { title: e.target.value })}
+                className={inputCls + " w-44 shrink-0"}
+              />
+              <button
+                type="button"
+                title="删除此区块"
+                onClick={() => remove(i)}
+                className="shrink-0 rounded-md border border-zinc-700 p-2 text-zinc-400 transition hover:border-rose-500 hover:text-rose-400"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          );
+        })}
+        {rows.length === 0 && (
+          <p className="rounded-md border border-dashed border-zinc-800 px-3 py-2 text-xs text-zinc-500">
+            还没有分类区块，点下方按钮添加。
+          </p>
+        )}
+      </div>
+      {cats === null && !loadErr && (
+        <p className="mt-2 text-[11px] text-zinc-500">正在加载分类…</p>
+      )}
+      {loadErr && <p className="mt-2 text-[11px] text-rose-400">{loadErr}</p>}
+      <button
+        type="button"
+        onClick={add}
+        className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-dashed border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 transition hover:border-indigo-500 hover:text-indigo-400"
+      >
+        <Plus size={13} /> 添加分类区块
+      </button>
+      {field.help && <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{field.help}</p>}
     </div>
   );
 }

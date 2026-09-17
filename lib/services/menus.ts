@@ -11,6 +11,7 @@ export type MenuNode = {
   url: string;
   type: string;
   target: string;
+  icon: string | null;
   children: MenuNode[];
 };
 
@@ -30,6 +31,7 @@ export type MenuItemInput = {
   url: string;
   referenceSlug?: string | null;
   target?: string;
+  icon?: string | null;
 };
 
 /** Build a nested tree from a flat, ordered list of menu items. */
@@ -42,6 +44,7 @@ function buildTree(flat: MenuItem[]): MenuNode[] {
       url: it.url,
       type: it.type,
       target: it.target,
+      icon: it.icon,
       children: [],
     }),
   );
@@ -130,6 +133,7 @@ export async function updateMenu(
           url: it.url,
           referenceSlug: it.referenceSlug ?? null,
           target: it.target ?? "_self",
+          icon: it.icon ?? null,
         })),
       );
     }

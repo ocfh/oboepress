@@ -82,7 +82,6 @@ const POSTS: Array<{
   tags: string[];
   paras: string[];
   views: number;
-  comments: number;
 }> = [
   {
     title: "复盘「Bluemix」玻璃拟物主题 · Design",
@@ -94,7 +93,6 @@ const POSTS: Array<{
       "Bluemix 精心对齐了视觉变量、卡片色调计算与布局结构，让整体观感通透而统一。",
     ],
     views: 1280,
-    comments: 24,
   },
   {
     title: "用 Next.js 构建无头 CMS · Dev",
@@ -106,7 +104,6 @@ const POSTS: Array<{
       "这让博客的主题化开发变得非常顺滑——在 OboePress 的注册表机制下，主题与业务代码完全解耦，切换主题只需一行配置。",
     ],
     views: 956,
-    comments: 18,
   },
   {
     title: "晨间的光 · Life",
@@ -118,7 +115,6 @@ const POSTS: Array<{
       "记录它们，是为了在忙碌的日常里，依然记得自己为什么而活。",
     ],
     views: 412,
-    comments: 6,
   },
   {
     title: "京都三日漫游 · Travel",
@@ -130,7 +126,6 @@ const POSTS: Array<{
       "旅行未必需要太多计划，把节奏放慢，惊喜自然会来。",
     ],
     views: 2301,
-    comments: 42,
   },
   {
     title: "封面大图与卡片色调 · Design",
@@ -142,7 +137,6 @@ const POSTS: Array<{
       "在服务端渲染的移植版里，我们采用基于文章 slug 的稳定配色来模拟这一行为，让同文同色、重载不变。",
     ],
     views: 765,
-    comments: 12,
   },
   {
     title: "关于容器布局的取舍 · Dev",
@@ -154,7 +148,6 @@ const POSTS: Array<{
       "栅格列数也随断点切换，从 4 列逐步降到 2 列，卡片始终饱满不留白。",
     ],
     views: 320,
-    comments: 3,
   },
   {
     title: "冬日手记 · Life",
@@ -166,7 +159,6 @@ const POSTS: Array<{
       "愿新的一年，仍保有对微小事物的热忱。",
     ],
     views: 281,
-    comments: 2,
   },
   {
     title: "城市漫游：上海 · Travel",
@@ -178,7 +170,6 @@ const POSTS: Array<{
       "上海的另一面藏在这些新旧交叠的街巷里，需要放慢脚步才能读到。",
     ],
     views: 1893,
-    comments: 27,
   },
   {
     title: "深浅色下的玻璃拟物 · Design",
@@ -190,7 +181,6 @@ const POSTS: Array<{
       "本主题默认浅色，通透的观感留给阅读本身。",
     ],
     views: 522,
-    comments: 9,
   },
   {
     title: "pglite：零配置的嵌入式数据库 · Dev",
@@ -202,7 +192,6 @@ const POSTS: Array<{
       "开发体验因此接近 SQLite 的轻量，同时保留 Postgres 全部能力。",
     ],
     views: 1104,
-    comments: 15,
   },
 ];
 
@@ -215,7 +204,7 @@ async function main() {
   await db
     .update(siteSettings)
     .set({
-      activeThemeSlug: "Bluemix",
+      activeThemeSlug: "bluemix",
       siteTitle: "OboePress 示例站",
       siteDescription: "Design a colorful life — 玻璃拟物主题 Bluemix",
       tagline: "设计、摄影与生活的色彩",
@@ -335,7 +324,6 @@ async function main() {
         status: "published",
         featuredImage: cover(i + 1),
         commentStatus: "open",
-        commentsCount: p.comments,
         views: p.views,
         authorId,
         publishedAt: new Date(Date.now() - i * 86400000),

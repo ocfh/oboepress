@@ -5,9 +5,17 @@ import type { MenuNode } from "@/lib/services/menus";
 export default function NavTree({
   nodes,
   className = "",
+  renderIcon,
 }: {
   nodes: MenuNode[];
   className?: string;
+  /**
+   * Optional server-side icon renderer for a menu node. Return null when the
+   * node has no usable icon. NavTree itself is an RSC, so callers may pass a
+   * function that renders server-only icon components. Themes that don't opt in
+   * simply omit it and keep the original text-only look.
+   */
+  renderIcon?: (node: MenuNode) => React.ReactNode;
 }) {
   if (!nodes.length) return null;
   return (
@@ -17,8 +25,9 @@ export default function NavTree({
           <Link
             href={n.url}
             target={n.target === "_blank" ? "_blank" : undefined}
-            className="block px-3 py-2 text-sm text-zinc-300 transition hover:text-white"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-300 transition hover:text-white"
           >
+            {renderIcon ? renderIcon(n) : null}
             {n.label}
           </Link>
           {n.children.length > 0 && (
@@ -28,8 +37,9 @@ export default function NavTree({
                   <Link
                     href={c.url}
                     target={c.target === "_blank" ? "_blank" : undefined}
-                    className="block px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5 hover:text-white"
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm text-zinc-300 transition hover:bg-white/5 hover:text-white"
                   >
+                    {renderIcon ? renderIcon(c) : null}
                     {c.label}
                   </Link>
                 </li>

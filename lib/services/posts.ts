@@ -377,3 +377,14 @@ export async function deletePost(user: SessionUser, id: number) {
 export async function incrementViews(id: number): Promise<void> {
   await db.execute(sql`update ${posts} set views = views + 1 where id = ${id}`);
 }
+
+/** Increment the like counter; returns the new total. */
+export async function likePost(id: number): Promise<number> {
+  const [row] = await db
+    .update(posts)
+    .set({ likes: sql`likes + 1` })
+    .where(eq(posts.id, id))
+    .returning({ likes: posts.likes });
+  if (!row) throw new NotFoundError("文章不存在");
+  return row.likes;
+}

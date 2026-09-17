@@ -122,6 +122,33 @@ export async function updateUser(
   return publicUser(row);
 }
 
+/**
+ * Update the current user's own display name + email (self-service profile
+ * box). Email uniqueness is enforced; role/password stay untouched.
+ */
+export async function changeOwnProfile(
+  actor: SessionUser,
+  input: { name: string; email: string },
+): Promise<Omit<User, "passwordHash">> {
+  const [target] = await db.select().from(users).where(eq(users.id, actor.id));
+  if (!target) throw new NotFoundError("用户不存在");
+  const name = input.name.trim();
+  const email = input.email.trim();
+  if (email !== target.email) {
+    const [exists] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.email, email));
+    if (exists) throw new ValidationError("邮箱已被其他账号使用");
+  }
+  const [row] = await db
+    .update(users)
+    .set({ name, email, updatedAt: new Date() })
+    .where(eq(users.id, actor.id))
+    .returning();
+  return publicUser(row);
+}
+
 /** Change the current user's own password after verifying the existing one. */
 export async function changeOwnPassword(
   actor: SessionUser,

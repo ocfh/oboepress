@@ -95,6 +95,8 @@ export const posts = pgTable(
     template: text("template"),
     /** Extra per-format payload: quote source, link target, video embed, … */
     formatMeta: jsonb("format_meta").$type<Record<string, string>>().notNull().default({}),
+    // Total likes (incremented by the public post-like action).
+    likes: integer("likes").notNull().default(0),
   },
   (t) => ({
     slugIdx: uniqueIndex("posts_slug_idx").on(t.slug),
@@ -251,6 +253,8 @@ export const menuItems = pgTable(
     referenceId: integer("reference_id"),
     referenceSlug: text("reference_slug"),
     target: text("target").notNull().default("_self"),
+    // Optional lucide icon name (kebab-case) shown next to the label by themes.
+    icon: text("icon"),
   },
   (t) => ({ menuIdx: index("menu_items_menu_idx").on(t.menuId) }),
 );
@@ -300,6 +304,8 @@ export const siteSettings = pgTable("site_settings", {
   requireNameEmail: boolean("require_name_email").notNull().default(false),
   commentModeration: boolean("comment_moderation").notNull().default(false),
   commentModerationWords: text("comment_moderation_words").notNull().default(""),
+  /** Prefilled text in the built-in comment box (visitor can edit freely). */
+  commentDefaultContent: text("comment_default_content").notNull().default(""),
 
   // --- Comment provider: builtin | artalk | giscus | waline | twikoo | disqus | utterances | none ---
   commentProvider: text("comment_provider").notNull().default("builtin"),
@@ -359,6 +365,8 @@ export const siteSettings = pgTable("site_settings", {
 
   // --- Social / contact links used by themes ---
   socialLinks: jsonb("social_links").$type<SocialLink[]>().notNull().default([]),
+  /** Footer link row: text may contain HTML, image is an optional 16px icon. */
+  footerLinks: jsonb("footer_links").$type<FooterLink[]>().notNull().default([]),
 
   /** Timezone + date format used when rendering dates on the public site. */
   timezone: text("timezone").notNull().default("Asia/Shanghai"),
@@ -369,6 +377,8 @@ export const siteSettings = pgTable("site_settings", {
 });
 
 export type SocialLink = { label: string; url: string; icon?: string };
+
+export type FooterLink = { text: string; url: string; image?: string };
 
 /**
  * Generic key/value option store.

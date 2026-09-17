@@ -1,6 +1,11 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { siteSettings, type SiteSettings, type SocialLink } from "@/db/schema";
+import {
+  siteSettings,
+  type SiteSettings,
+  type SocialLink,
+  type FooterLink,
+} from "@/db/schema";
 import { ensureBootstrap } from "./bootstrap";
 
 export type SiteSettingsInput = {
@@ -14,12 +19,14 @@ export type SiteSettingsInput = {
   activeThemeSlug?: string;
   icpNumber?: string;
   socialLinks?: SocialLink[];
+  footerLinks?: FooterLink[];
 
   // Comments
   commentsEnabled?: boolean;
   requireNameEmail?: boolean;
   commentModeration?: boolean;
   commentModerationWords?: string;
+  commentDefaultContent?: string;
 
   // Comment provider (builtin / artalk / giscus / waline / twikoo / disqus / utterances / none)
   commentProvider?: string;
@@ -104,11 +111,13 @@ export async function updateSettings(
       activeThemeSlug: input.activeThemeSlug,
       icpNumber: input.icpNumber,
       socialLinks: input.socialLinks,
+      footerLinks: input.footerLinks,
 
       commentsEnabled: input.commentsEnabled,
       requireNameEmail: input.requireNameEmail,
       commentModeration: input.commentModeration,
       commentModerationWords: input.commentModerationWords,
+      commentDefaultContent: input.commentDefaultContent,
 
       commentProvider: input.commentProvider,
       artalkServer: input.artalkServer,

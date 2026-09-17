@@ -15,7 +15,15 @@ export type FieldType =
   | "code"
   | "font"
   | "links" // repeatable {label,url} list
+  | "footerLinks" // repeatable {text,url,image?} list — footer links
+  | "categoryRows" // repeatable {slug,title} list — homepage category sections
   | "group"; // visual sub-heading, no value
+
+/** One row of a `categoryRows` field: a category plus optional title override. */
+export interface CategoryRow {
+  slug: string;
+  title: string;
+}
 
 export interface SettingField {
   key: string;
@@ -87,6 +95,25 @@ export function coerceField(field: SettingField, raw: unknown): unknown {
       return raw === true || raw === "true" || raw === "on" || raw === 1;
     case "links":
       return Array.isArray(raw) ? raw : [];
+    case "footerLinks":
+      return Array.isArray(raw)
+        ? raw
+            .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
+            .map((r) => ({
+              text: String(r.text ?? ""),
+              url: String(r.url ?? ""),
+              image: r.image ? String(r.image) : undefined,
+            }))
+        : [];
+    case "categoryRows":
+      return Array.isArray(raw)
+        ? raw
+            .filter((r): r is Record<string, unknown> => !!r && typeof r === "object")
+            .map((r) => ({
+              slug: String(r.slug ?? ""),
+              title: String(r.title ?? ""),
+            }))
+        : [];
     default:
       return typeof raw === "string" ? raw : raw == null ? "" : String(raw);
   }

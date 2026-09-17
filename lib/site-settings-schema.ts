@@ -23,7 +23,13 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
       },
       { key: "logoUrl", label: "Logo", type: "image", default: "" },
       { key: "faviconUrl", label: "Favicon", type: "image", default: "" },
-      { key: "footerText", label: "页脚文字", type: "text", default: "" },
+      {
+        key: "footerText",
+        label: "页脚版权文字",
+        type: "textarea",
+        default: "",
+        help: "支持 HTML，留空则使用默认版权行。例如：Designed &amp; Coded by PANDA Studio © 2023",
+      },
       { key: "icpNumber", label: "备案号", type: "text", default: "", half: true },
       {
         key: "activeThemeSlug",
@@ -35,6 +41,13 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
         help: "细节调整请到「主题」页面的设置面板。",
       },
       { key: "socialLinks", label: "社交链接", type: "links", default: [] },
+      {
+        key: "footerLinks",
+        label: "页脚链接",
+        type: "footerLinks",
+        default: [],
+        help: "显示在页脚右侧的链接行（友链、备案号等）。文字支持 HTML；图标填 16px 小图 URL，留空则只显示文字。配置后优先于上方「备案号」。",
+      },
     ],
   },
   {
@@ -222,6 +235,14 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
         default: "",
         placeholder: "广告\n赌博",
         help: "每行一个；命中的评论标记为待审核。",
+      },
+      {
+        key: "commentDefaultContent",
+        label: "评论框默认内容",
+        type: "textarea",
+        default: "",
+        placeholder: "留空则不预填",
+        help: "访客打开文章时评论框自动填入的文字，可自由修改后提交。",
       },
       { key: "group_provider", label: "评论系统", type: "group" },
       {

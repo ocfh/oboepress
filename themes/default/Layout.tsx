@@ -1,8 +1,10 @@
 ﻿import Link from "next/link";
 import { Search } from "lucide-react";
 import { getSettings } from "@/lib/services/settings";
-import { getMenuByLocation } from "@/lib/services/menus";
+import { getMenuByLocation, type MenuNode } from "@/lib/services/menus";
+import { getActiveThemeSettings } from "@/lib/services/themes";
 import NavTree from "@/components/shared/NavTree";
+import ServerIcon from "@/components/shared/ServerIcon";
 
 /**
  * OboePress default theme layout — dark blog with header nav + footer.
@@ -12,11 +14,19 @@ export default async function OboePressLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [settings, header, footer] = await Promise.all([
+  const [settings, header, footer, ts] = await Promise.all([
     getSettings(),
     getMenuByLocation("header"),
     getMenuByLocation("footer"),
+    getActiveThemeSettings(),
   ]);
+
+  // 默认主题的图标开关默认关闭：关闭时菜单完全不显示图标；开启后显示菜单项
+  // 上配置的自定义图标（未配置则不显示，主题不提供回退字形）。
+  const useCustomIcons = ts.useCustomIcons === true;
+  const renderMenuIcon = useCustomIcons
+    ? (n: MenuNode) => <ServerIcon name={n.icon} size={15} className="text-[var(--accent)]" />
+    : undefined;
 
   return (
     <div className="theme-root flex min-h-screen flex-col">
@@ -38,7 +48,11 @@ export default async function OboePressLayout({
             )}
           </Link>
           <nav className="ml-2 hidden flex-1 md:block">
-            <NavTree nodes={header?.items ?? []} className="flex flex-wrap items-center" />
+            <NavTree
+              nodes={header?.items ?? []}
+              className="flex flex-wrap items-center"
+              renderIcon={renderMenuIcon}
+            />
           </nav>
           <form action="/search" method="get" className="ml-auto hidden sm:block">
             <div className="relative">

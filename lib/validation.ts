@@ -146,6 +146,12 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8).max(200),
 });
 
+/** A logged-in user editing their own display name + email. */
+export const profileSchema = z.object({
+  name: z.string().min(1).max(100),
+  email: z.string().email().max(120),
+});
+
 /** First-run setup: create the initial admin + site identity. */
 export const setupSchema = z.object({
   siteTitle: z.string().min(1).max(120).optional(),
@@ -162,6 +168,13 @@ const socialLinkSchema = z.object({
   label: z.string().max(60).default(""),
   url: z.string().max(500).default(""),
   icon: z.string().max(60).optional(),
+});
+
+/** `{text,url,image?}` rows produced by the `footerLinks` field type. */
+const footerLinkSchema = z.object({
+  text: z.string().max(300).default(""),
+  url: z.string().max(500).default(""),
+  image: z.string().max(500).optional(),
 });
 
 /** Blank selects arrive as "" — treat that as "no page selected". */
@@ -181,12 +194,14 @@ export const siteSettingsSchema = z.object({
   activeThemeSlug: z.string().max(60).optional(),
   icpNumber: z.string().max(120).optional(),
   socialLinks: z.array(socialLinkSchema).max(30).optional(),
+  footerLinks: z.array(footerLinkSchema).max(20).optional(),
 
   // Comments
   commentsEnabled: z.boolean().optional(),
   requireNameEmail: z.boolean().optional(),
   commentModeration: z.boolean().optional(),
   commentModerationWords: z.string().max(2000).optional(),
+  commentDefaultContent: z.string().max(2000).optional(),
 
   // Comment provider (builtin / artalk / giscus / waline / twikoo / disqus / utterances / none)
   commentProvider: z
@@ -267,6 +282,7 @@ export const menuItemSchema = z.object({
   url: z.string().max(500),
   referenceSlug: z.string().nullable().optional(),
   target: z.string().max(20).optional(),
+  icon: z.string().max(100).nullable().optional(),
 });
 
 export const menuInputSchema = z.object({

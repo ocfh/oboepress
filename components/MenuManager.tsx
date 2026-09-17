@@ -10,6 +10,7 @@ import {
   CornerDownRight,
   Trash2,
 } from "lucide-react";
+import IconPicker from "./admin/IconPicker";
 
 type Node = {
   id: number;
@@ -17,6 +18,7 @@ type Node = {
   url: string;
   type: string;
   target: string;
+  icon: string | null;
   children: Node[];
 };
 
@@ -31,6 +33,7 @@ type FlatItem = {
   url: string;
   referenceSlug: string | null;
   target: string;
+  icon: string | null;
   depth: number;
 };
 
@@ -46,6 +49,7 @@ function flatten(nodes: Node[], depth = 0): FlatItem[] {
       url: n.url,
       referenceSlug: null,
       target: n.target,
+      icon: n.icon ?? null,
       depth,
     });
     if (n.children?.length) out.push(...flatten(n.children, depth + 1).map((c) => ({ ...c, parentId: n.id! })));
@@ -109,7 +113,7 @@ export default function MenuManager() {
   }
 
   function addItem() {
-    setFlat((f) => [...f, { parentId: null, order: f.length, type: "custom", label: "", url: "", referenceSlug: null, target: "_self", depth: 0 }]);
+    setFlat((f) => [...f, { parentId: null, order: f.length, type: "custom", label: "", url: "", referenceSlug: null, target: "_self", icon: null, depth: 0 }]);
   }
 
   function removeItem(idx: number) {
@@ -142,6 +146,7 @@ export default function MenuManager() {
         url: it.url,
         referenceSlug: it.referenceSlug,
         target: it.target,
+        icon: it.icon,
       })),
     };
     const res = await fetch(`/api/menus/${activeId}`, {
@@ -217,38 +222,49 @@ export default function MenuManager() {
               <option value="tag">标签</option>
             </select>
 
-            {it.type === "custom" ? (
-              <>
-                <input
-                  value={it.label}
-                  onChange={(e) => update(idx, { label: e.target.value })}
-                  placeholder="显示文字"
-                  className="w-32 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
-                />
-                <input
-                  value={it.url}
-                  onChange={(e) => update(idx, { url: e.target.value })}
-                  placeholder="链接 /"
-                  className="w-48 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
-                />
-              </>
-            ) : (
+            {it.type !== "custom" && (
               <select
-                value={it.label ? `${it.label}|${it.url}` : ""}
+                value={it.url}
                 onChange={(e) => {
-                  const [label, url] = e.target.value.split("|");
-                  update(idx, { label, url });
+                  // 选中目标后填入链接与默认文字；旁边的显示文字输入框仍可自由修改，
+                  // select 以 url 作为选中依据，自定义文字后也不会跳回空选项。
+                  const url = e.target.value;
+                  const matched = (options[it.type] ?? []).find((o) => o.url === url);
+                  update(idx, { url, label: matched?.label ?? it.label });
                 }}
-                className="w-64 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
+                className="w-52 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
               >
-                <option value="">选择…</option>
+                <option value="">选择{it.type === "post" ? "文章" : it.type === "page" ? "页面" : it.type === "category" ? "分类" : "标签"}…</option>
                 {(options[it.type] ?? []).map((o) => (
-                  <option key={o.id} value={`${o.label}|${o.url}`}>
+                  <option key={o.id} value={o.url}>
                     {o.label}
                   </option>
                 ))}
               </select>
             )}
+
+            <input
+              value={it.label}
+              onChange={(e) => update(idx, { label: e.target.value })}
+              placeholder="显示文字"
+              title="前台显示文字，可自行修改"
+              className="w-28 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
+            />
+            {it.type === "custom" && (
+              <input
+                value={it.url}
+                onChange={(e) => update(idx, { url: e.target.value })}
+                placeholder="链接 /"
+                className="w-44 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
+              />
+            )}
+            {it.type !== "custom" && (
+              <span className="max-w-56 truncate font-mono text-xs text-zinc-500" title={it.url}>
+                {it.url || "未选择"}
+              </span>
+            )}
+
+            <IconPicker compact value={it.icon} onChange={(v) => update(idx, { icon: v })} />
 
             <div className="ml-auto flex gap-1 text-xs">
               <button
