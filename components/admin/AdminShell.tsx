@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   UserPlus,
   UserRound,
+  Bell,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
@@ -44,6 +45,7 @@ const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adm
   { href: "/admin/permalinks", label: "固定链接", icon: Link2, superOnly: true },
   { href: "/admin/security", label: "后台安全", icon: ShieldCheck, superOnly: true },
   { href: "/admin/members", label: "会员注册", icon: UserPlus, superOnly: true },
+  { href: "/admin/notify", label: "通知验证码", icon: Bell, superOnly: true },
   { href: "/admin/users", label: "用户", icon: Users, superOnly: true },
 ];
 

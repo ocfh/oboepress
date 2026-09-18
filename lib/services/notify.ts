@@ -109,8 +109,11 @@ export const getNotifySettings = cache(async (): Promise<NotifySettings> => {
   };
 });
 
+/** 嵌套对象也全部可选（zod partial 校验后的入参形态）。 */
+type DeepPartial<T> = { [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] };
+
 export async function saveNotifySettings(
-  input: Partial<NotifySettings>,
+  input: DeepPartial<NotifySettings>,
 ): Promise<NotifySettings> {
   const cur = await getNotifySettings();
   const next: NotifySettings = {
@@ -205,12 +208,23 @@ function escapeHtml(s: string): string {
   );
 }
 
-async function deliverViaEmail(to: string, subject: string, text: string, html: string) {
+async function deliverViaEmail(
+  to: string,
+  subject: string,
+  text: string,
+  html: string,
+  vars: { code?: string; purpose?: string } = {},
+) {
   const s = await getNotifySettings();
   if (!s.email.enabled) throw new ValidationError("邮件通道未开启");
   if (s.email.via === "webhook") {
-    // 邮件 Webhook 只拿到目标地址，正文类网关通常自行套模板。
-    await invokeWebhook(s.email.webhook, { target: to, code: "", sign: s.sms.signature, purpose: "" });
+    // 同时下发 code/purpose：正文类网关忽略即可，直发码类网关可直接拼模板。
+    await invokeWebhook(s.email.webhook, {
+      target: to,
+      code: vars.code ?? "",
+      sign: s.sms.signature,
+      purpose: vars.purpose ?? "",
+    });
     return;
   }
   if (!s.smtp.host) throw new ValidationError("SMTP 未配置");
@@ -259,7 +273,7 @@ export async function sendVerificationCode(input: {
   const code = await issueCode(input);
   try {
     const settings = await getSettings();
-    const siteName = settings.title || "OboePress";
+    const siteName = settings.siteTitle || "OboePress";
     const label = PURPOSE_LABEL[input.purpose];
     if (input.channel === "email") {
       const subject = `【${siteName}】${label}验证码 ${code}`;
@@ -271,7 +285,10 @@ export async function sendVerificationCode(input: {
         `<p style="font-size:28px;font-weight:700;letter-spacing:6px">${code}</p>` +
         `<p style="color:#888;font-size:12px">10 分钟内有效，请勿泄露给他人。如非本人操作请忽略此邮件。</p>` +
         `</div>`;
-      await deliverViaEmail(input.target, subject, text, html);
+      await deliverViaEmail(input.target, subject, text, html, {
+        code,
+        purpose: input.purpose,
+      });
     } else {
       await deliverViaSms(input.target, code);
     }
@@ -290,6 +307,8 @@ export async function sendTestMessage(channel: CodeChannel, target: string): Pro
       "OboePress 通知通道测试",
       "这是一封来自 OboePress 的测试邮件，收到即表示 SMTP / Webhook 配置可用。",
       "<p>这是一封来自 <b>OboePress</b> 的测试邮件，收到即表示通知通道配置可用。</p>",
+      // 与短信测试一致：SMTP 分支忽略 vars；Webhook 分支拿到带固定码的真实模板载荷。
+      { code: "888888", purpose: "test" },
     );
   } else {
     const s = await getNotifySettings();

@@ -253,6 +253,9 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
       code: input.phoneCode ?? "",
     });
   }
+  // 验证码校验通过即证明邮箱 / 手机所有权：verified 与是否「强制校验」一致。
+  const emailVerifiedFlag = !!(emailRaw && notify.register.emailVerify);
+  const phoneVerifiedFlag = !!(phoneRaw && notify.register.phoneVerify);
 
   // 唯一校验全部走不区分大小写比较，避免 "Tom"/"tom" 造成登录歧义。
   const [nameTaken] = await db
@@ -286,9 +289,8 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
       phone: phoneRaw || null,
       passwordHash: await hashPassword(input.password),
       role: member.defaultRole,
-      // 自助注册的邮箱/手机均未验证，保持 verified=false。
-      emailVerified: false,
-      phoneVerified: false,
+      emailVerified: emailVerifiedFlag,
+      phoneVerified: phoneVerifiedFlag,
     })
     .returning();
 
