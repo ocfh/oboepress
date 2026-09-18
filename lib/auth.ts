@@ -6,7 +6,7 @@ import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { db, ensureMigrations } from "@/db";
 import { users } from "@/db/schema";
 import type { Role } from "@/db/schema";
 
@@ -94,13 +94,19 @@ export async function verifyCredentials(
   email: string,
   password: string,
 ): Promise<SessionUser | null> {
+  await ensureMigrations();
   const [row] = await db
     .select()
     .from(users)
     .where(eq(users.email, email));
   if (!row) return null;
   const ok = await verifyPassword(password, row.passwordHash);
-  if (!ok) return null;
+  // Banned accounts fail like any other invalid credential.
+  if (!ok || row.status !== "active") return null;
+  await db
+    .update(users)
+    .set({ lastLoginAt: new Date() })
+    .where(eq(users.id, row.id));
   return { id: row.id, email: row.email, name: row.name, role: row.role };
 }
 
@@ -111,12 +117,21 @@ export function clearSessionCookie(): void {
 async function verifyToken(token: string): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret());
-    return {
-      id: payload.id as number,
-      email: payload.email as string,
-      name: payload.name as string,
-      role: payload.role as Role,
-    };
+    await ensureMigrations();
+    const id = payload.id as number;
+    // One indexed PK lookup: a banned (or deleted) user's existing token
+    // stops working immediately instead of living out its 7-day JWT life.
+    const [row] = await db
+      .select({
+        status: users.status,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+      })
+      .from(users)
+      .where(eq(users.id, id));
+    if (!row || row.status !== "active") return null;
+    return { id, email: row.email, name: row.name, role: row.role };
   } catch {
     return null;
   }

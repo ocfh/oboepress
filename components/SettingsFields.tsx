@@ -15,6 +15,7 @@ import {
   type SettingField,
   type SettingSection,
 } from "@/lib/settings-schema";
+import IconPicker from "./admin/IconPicker";
 
 /**
  * Generic, schema-driven settings renderer.
@@ -460,9 +461,10 @@ function FooterLinksField({
 }
 
 /**
- * Repeatable homepage category-section editor: each row picks a category and
- * an optional title override; rows can be reordered (render order on the
- * homepage follows the list order). Categories load from the public API.
+ * Repeatable homepage category-section editor: each row picks a category,
+ * an optional title override, and an optional lucide icon (shown at the
+ * section title); rows can be reordered (render order on the homepage
+ * follows the list order). Categories load from the public API.
  */
 function CategoryRowsField({
   field,
@@ -492,9 +494,9 @@ function CategoryRowsField({
     };
   }, []);
 
-  const rows: { slug?: string; title?: string }[] = Array.isArray(value) ? value : [];
+  const rows: { slug?: string; title?: string; icon?: string | null }[] = Array.isArray(value) ? value : [];
 
-  const update = (i: number, patch: Partial<{ slug: string; title: string }>) => {
+  const update = (i: number, patch: Partial<{ slug: string; title: string; icon: string | null }>) => {
     onChange(rows.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
   };
   const remove = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
@@ -508,7 +510,7 @@ function CategoryRowsField({
   const add = () => {
     const used = new Set(rows.map((r) => r.slug));
     const first = (cats ?? []).find((c) => !used.has(c.slug));
-    onChange([...rows, { slug: first?.slug ?? "", title: "" }]);
+    onChange([...rows, { slug: first?.slug ?? "", title: "", icon: null }]);
   };
 
   const iconBtn =
@@ -567,6 +569,13 @@ function CategoryRowsField({
                 onChange={(e) => update(i, { title: e.target.value })}
                 className={inputCls + " w-44 shrink-0"}
               />
+              <div title="区块标题图标（留空显示默认彩条）" className="shrink-0">
+                <IconPicker
+                  compact
+                  value={it.icon ?? null}
+                  onChange={(icon) => update(i, { icon })}
+                />
+              </div>
               <button
                 type="button"
                 title="删除此区块"
@@ -613,7 +622,7 @@ export function SectionFields({
   return (
     <div className="grid grid-cols-2 gap-4">
       {section.fields
-        .filter((f) => isFieldVisible(f, values))
+        .filter((f) => f.type !== "hidden" && isFieldVisible(f, values))
         .map((f) => (
           <Field
             key={f.key}

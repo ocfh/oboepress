@@ -45,17 +45,84 @@ export const postFormatEnum = pgEnum("post_format", [
   "status",
 ]);
 
-export const users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  email: text("email").notNull().unique(),
-  name: text("name").notNull(),
-  passwordHash: text("password_hash").notNull(),
-  role: roleEnum("role").notNull().default("author"),
-  avatarUrl: text("avatar_url"),
-  bio: text("bio"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    email: text("email").notNull().unique(),
+    name: text("name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    role: roleEnum("role").notNull().default("author"),
+    avatarUrl: text("avatar_url"),
+    bio: text("bio"),
+    /** Mobile number (E.164-ish, admin/self editable); multiple NULLs are allowed. */
+    phone: text("phone"),
+    /** "active" | "banned" — banned users cannot start a session. */
+    status: text("status").notNull().default("active"),
+    emailVerified: boolean("email_verified").notNull().default(false),
+    phoneVerified: boolean("phone_verified").notNull().default(false),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ phoneIdx: uniqueIndex("users_phone_idx").on(t.phone) }),
+);
+
+/**
+ * Third-party OAuth identities (QQ / WeChat / GitHub / …). One user may own
+ * many rows (one account, multiple login methods); each (provider, openId)
+ * pair resolves to exactly one local user.
+ */
+export const oauthIdentities = pgTable(
+  "oauth_identities",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Provider key: "github" | "qq" | "wechat" | "custom:<slug>" … */
+    provider: text("provider").notNull(),
+    /** Stable external account id (openid / unionid / node_id). */
+    openId: text("open_id").notNull(),
+    /** Cached profile fields, refreshed on each login. */
+    nickname: text("nickname"),
+    avatarUrl: text("avatar_url"),
+    raw: jsonb("raw").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+  },
+  (t) => ({
+    providerOpenIdx: uniqueIndex("oauth_identities_provider_open_idx").on(
+      t.provider,
+      t.openId,
+    ),
+    userIdx: index("oauth_identities_user_idx").on(t.userId),
+  }),
+);
+
+/**
+ * Short-lived verification codes (email/SMS): registration, login, password
+ * reset, binding. Only the SHA-256 hash of the code is stored.
+ */
+export const verifyCodes = pgTable(
+  "verify_codes",
+  {
+    id: serial("id").primaryKey(),
+    /** Delivery target: email address or phone number. */
+    target: text("target").notNull(),
+    /** "email" | "sms" */
+    channel: text("channel").notNull(),
+    /** "register" | "login" | "reset" | "bind" | … */
+    purpose: text("purpose").notNull(),
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    attempts: integer("attempts").notNull().default(0),
+    ip: text("ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ targetIdx: index("verify_codes_target_idx").on(t.target, t.purpose) }),
+);
 
 // Reusable content columns shared by posts and pages.
 const contentColumns = {
@@ -68,6 +135,8 @@ const contentColumns = {
   featuredImage: text("featured_image"),
   seoTitle: text("seo_title"),
   seoDescription: text("seo_description"),
+  /** Comma-separated SEO keywords for this entry. */
+  seoKeywords: text("seo_keywords"),
   // Comments: open/closed switch + denormalized count for fast listing.
   commentStatus: commentStatusEnum("comment_status").notNull().default("open"),
   commentsCount: integer("comments_count").notNull().default(0),
@@ -97,11 +166,19 @@ export const posts = pgTable(
     formatMeta: jsonb("format_meta").$type<Record<string, string>>().notNull().default({}),
     // Total likes (incremented by the public post-like action).
     likes: integer("likes").notNull().default(0),
+    // --- M2 configurable permalinks ---
+    // Persisted pinyin / initials tails so /blog/ni-hao-shijie reverses to a
+    // post via an indexed lookup. Populated on create/update; NULL only for
+    // pre-migration rows (backfilled once when permalink settings are saved).
+    pinyinSlug: text("pinyin_slug"),
+    initialSlug: text("initial_slug"),
   },
   (t) => ({
     slugIdx: uniqueIndex("posts_slug_idx").on(t.slug),
     statusIdx: index("posts_status_idx").on(t.status),
     pinnedIdx: index("posts_pinned_idx").on(t.pinned),
+    pinyinIdx: uniqueIndex("posts_pinyin_slug_idx").on(t.pinyinSlug),
+    initialIdx: uniqueIndex("posts_initial_slug_idx").on(t.initialSlug),
   }),
 );
 
@@ -275,6 +352,8 @@ export const postMetas = pgTable(
 
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type OauthIdentity = typeof oauthIdentities.$inferSelect;
+export type VerifyCode = typeof verifyCodes.$inferSelect;
 export type Post = typeof posts.$inferSelect;
 export type Page = typeof pages.$inferSelect;
 export type Media = typeof media.$inferSelect;

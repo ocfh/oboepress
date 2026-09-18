@@ -8,6 +8,7 @@ import { can } from "@/lib/rbac";
 import { blocksToPlainText } from "@/lib/blocks";
 import { slugify, uniqueSlug, excerptFrom } from "@/lib/utils";
 import { ForbiddenError, NotFoundError } from "./errors";
+import { getPermalinkConfig, pageUrlFor } from "./links";
 import { getPostMetas, setPostMetas } from "./metas";
 
 export type PageQuery = {
@@ -16,7 +17,11 @@ export type PageQuery = {
   offset?: number;
 };
 
-export type PageListItem = Page & { metas: Record<string, string> };
+export type PageListItem = Page & {
+  /** Public URL under the current permalink config. */
+  url: string;
+  metas: Record<string, string>;
+};
 
 async function takenSlugs(base: string): Promise<Set<string>> {
   const rows = await db
@@ -27,7 +32,7 @@ async function takenSlugs(base: string): Promise<Set<string>> {
 }
 
 export async function listPages(opts: PageQuery = {}): Promise<{
-  items: Page[];
+  items: (Page & { url: string })[];
   total: number;
 }> {
   const limit = Math.min(opts.limit ?? 20, 100);
@@ -42,11 +47,14 @@ export async function listPages(opts: PageQuery = {}): Promise<{
     .limit(limit)
     .offset(offset);
 
-  const totalRows = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(pages)
-    .where(where);
-  return { items: rows, total: Number(totalRows[0]?.count ?? 0) };
+  const [totalRows, cfg] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(pages).where(where),
+    getPermalinkConfig(),
+  ]);
+  return {
+    items: rows.map((row) => ({ ...row, url: pageUrlFor(cfg, row) })),
+    total: Number(totalRows[0]?.count ?? 0),
+  };
 }
 
 export async function getPageById(id: number, includeUnpublished = false): Promise<PageListItem> {
@@ -54,7 +62,8 @@ export async function getPageById(id: number, includeUnpublished = false): Promi
   if (!row) throw new NotFoundError("页面不存在");
   if (!includeUnpublished && row.status !== "published")
     throw new NotFoundError("页面不存在");
-  return { ...row, metas: await getPostMetas(id) };
+  const [metas, cfg] = await Promise.all([getPostMetas(id), getPermalinkConfig()]);
+  return { ...row, url: pageUrlFor(cfg, row), metas };
 }
 
 export async function getPageBySlug(
@@ -65,7 +74,11 @@ export async function getPageBySlug(
   if (!row) throw new NotFoundError("页面不存在");
   if (!includeUnpublished && row.status !== "published")
     throw new NotFoundError("页面不存在");
-  return { ...row, metas: await getPostMetas(row.id) };
+  const [metas, cfg] = await Promise.all([
+    getPostMetas(row.id),
+    getPermalinkConfig(),
+  ]);
+  return { ...row, url: pageUrlFor(cfg, row), metas };
 }
 
 export async function createPage(user: SessionUser, input: PageInput): Promise<PageListItem> {
@@ -95,7 +108,7 @@ export async function createPage(user: SessionUser, input: PageInput): Promise<P
     })
     .returning();
   if (input.metas) await setPostMetas(page.id, input.metas);
-  return { ...page, metas: await getPostMetas(page.id) };
+  return getPageById(page.id, true);
 }
 
 export async function updatePage(

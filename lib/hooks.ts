@@ -183,4 +183,11 @@ export const HOOKS = {
   mediaUploaded: "media.uploaded",
   /** action — ({ user }) fired after a successful login */
   userLoggedIn: "user.logged-in",
+  /**
+   * filter — ({ query, ids }) contribute ordered "floating" (sticky) post ids.
+   * Core floats them above date/views ordering on the first page of every
+   * public list, validates them against the archive's own filters, and
+   * excludes them from later pages so they can never appear twice.
+   */
+  postsPinned: "posts.pinned",
 } as const;

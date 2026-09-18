@@ -91,6 +91,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
         id: number;
         title: string;
         slug: string;
+        url: string;
         publishedAt: Date | null;
         featuredImage: string | null;
       }[];
@@ -112,7 +113,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
                   }}
                 />
               ) : null}
-              <Link href={`/blog/${p.slug}`} style={{ ...linkStyle, flex: 1 }}>
+              <Link href={p.url} style={{ ...linkStyle, flex: 1 }}>
                 {p.title}
               </Link>
               {cfg.showDate && p.publishedAt ? (
@@ -131,6 +132,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
         id: number;
         title: string;
         slug: string;
+        url: string;
         views: number;
       }[];
       return (
@@ -140,7 +142,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
               <span style={{ ...dimStyle, width: "1.2em", color: "var(--accent)" }}>
                 {i + 1}
               </span>
-              <Link href={`/blog/${p.slug}`} style={{ ...linkStyle, flex: 1 }}>
+              <Link href={p.url} style={{ ...linkStyle, flex: 1 }}>
                 {p.title}
               </Link>
               {cfg.showViews ? <span style={dimStyle}>{p.views}</span> : null}
@@ -155,13 +157,14 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
         id: number;
         name: string;
         slug: string;
+        url: string;
         count: number;
       }[];
       return (
         <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
           {items.map((c) => (
             <li key={c.id} style={rowStyle}>
-              <Link href={`/blog/category/${c.slug}`} style={linkStyle}>
+              <Link href={c.url} style={linkStyle}>
                 {c.name}
               </Link>
               {cfg.showCount ? <span style={dimStyle}>{c.count}</span> : null}
@@ -176,6 +179,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
         id: number;
         name: string;
         slug: string;
+        url: string;
         count: number;
       }[];
       const max = Math.max(1, ...items.map((t) => Number(t.count)));
@@ -188,7 +192,7 @@ async function WidgetBody({ widget }: { widget: ResolvedWidget }) {
             return (
               <Link
                 key={t.id}
-                href={`/blog/tag/${t.slug}`}
+                href={t.url}
                 style={{
                   fontSize: `${scale}rem`,
                   color: "var(--muted)",

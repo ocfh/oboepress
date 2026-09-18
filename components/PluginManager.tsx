@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
+  ExternalLink,
   Loader2,
   Plug,
   RefreshCw,
@@ -22,6 +24,7 @@ type PluginView = {
   enabled: boolean;
   installed: boolean;
   hasEntry: boolean;
+  hasAdmin?: boolean;
   settings: Record<string, unknown>;
   resolvedSettings: Record<string, unknown>;
   manifest: { settings?: SettingsSchema; hooks?: string[]; homepage?: string } | null;
@@ -131,6 +134,9 @@ export default function PluginManager() {
       <div className="grid gap-3 md:grid-cols-2">
         {items.map((p) => {
           const schema = p.manifest?.settings ?? [];
+          const hasVisibleFields = schema.some((s) =>
+            s.fields.some((f) => f.type !== "hidden" && f.type !== "group"),
+          );
           return (
             <div
               key={p.slug}
@@ -174,16 +180,28 @@ export default function PluginManager() {
                 </button>
               </div>
 
-              {schema.length > 0 && (
-                <button
-                  onClick={() => {
-                    setEditing(p);
-                    setDraft({ ...p.resolvedSettings });
-                  }}
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs text-indigo-400 transition hover:text-indigo-300"
-                >
-                  <Settings2 size={13} /> 插件设置
-                </button>
+              {(hasVisibleFields || p.hasAdmin) && (
+                <div className="mt-3 flex items-center gap-4">
+                  {hasVisibleFields && (
+                    <button
+                      onClick={() => {
+                        setEditing(p);
+                        setDraft({ ...p.resolvedSettings });
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs text-indigo-400 transition hover:text-indigo-300"
+                    >
+                      <Settings2 size={13} /> 插件设置
+                    </button>
+                  )}
+                  {p.hasAdmin && p.enabled && (
+                    <Link
+                      href={`/admin/plugins/${p.slug}`}
+                      className="inline-flex items-center gap-1.5 text-xs text-emerald-400 transition hover:text-emerald-300"
+                    >
+                      <ExternalLink size={13} /> 管理面板
+                    </Link>
+                  )}
+                </div>
               )}
             </div>
           );

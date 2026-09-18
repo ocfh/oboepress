@@ -61,3 +61,14 @@ export function pluginHasEntry(slug: string): boolean {
     fs.existsSync(path.join(dir, f)),
   );
 }
+
+/**
+ * Does the plugin ship a custom admin page? Convention: `plugins/<slug>/admin.tsx`
+ * (default-exported client component), hosted at /admin/plugins/<slug>.
+ */
+export function pluginHasAdmin(slug: string): boolean {
+  const dir = path.join(PLUGINS_DIR, slug);
+  return ["admin.tsx", "admin.jsx", "admin.js"].some((f) =>
+    fs.existsSync(path.join(dir, f)),
+  );
+}

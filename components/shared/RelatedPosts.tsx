@@ -22,7 +22,7 @@ export default async function RelatedPosts({ postId }: { postId: number }) {
         {related.map((p) => (
           <Link
             key={p.id}
-            href={`/blog/${p.slug}`}
+            href={p.url}
             className="group rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4 transition hover:border-[var(--accent)]"
           >
             <h3 className="line-clamp-2 font-medium text-zinc-100 transition group-hover:text-[var(--accent)]">

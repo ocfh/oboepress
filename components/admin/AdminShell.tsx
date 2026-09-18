@@ -17,6 +17,7 @@ import {
   Plug,
   LayoutGrid,
   Shapes,
+  Link2,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,7 @@ const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adm
   { href: "/admin/menus", label: "菜单", icon: MenuIcon, superOnly: true },
   { href: "/admin/plugins", label: "插件", icon: Plug, superOnly: true },
   { href: "/admin/settings", label: "设置", icon: Settings, superOnly: true },
+  { href: "/admin/permalinks", label: "固定链接", icon: Link2, superOnly: true },
   { href: "/admin/users", label: "用户", icon: Users, superOnly: true },
 ];
 

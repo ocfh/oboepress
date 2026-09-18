@@ -4,6 +4,7 @@ import { plugins, type Plugin } from "@/db/schema";
 import {
   discoverPlugins,
   getPluginManifest,
+  pluginHasAdmin,
   pluginHasEntry,
   type PluginManifest,
 } from "@/lib/plugins/registry";
@@ -17,6 +18,8 @@ export type PluginView = Plugin & {
   /** Present on disk? A row can outlive a deleted folder. */
   installed: boolean;
   hasEntry: boolean;
+  /** Ships a custom admin page at plugins/<slug>/admin.tsx. */
+  hasAdmin: boolean;
   /** defaults merged with stored values */
   resolvedSettings: Record<string, unknown>;
 };
@@ -64,6 +67,7 @@ export async function listPlugins(): Promise<PluginView[]> {
       manifest,
       installed: !!manifest,
       hasEntry: !!manifest && pluginHasEntry(row.slug),
+      hasAdmin: !!manifest && pluginHasAdmin(row.slug),
       resolvedSettings: resolveSettings(manifest?.settings ?? [], row.settings),
     };
   });
@@ -88,6 +92,7 @@ export async function setPluginEnabled(
     .returning();
   if (!row) throw new NotFoundError("插件不存在");
   invalidatePluginCache();
+  pluginsReady = false;
   await ensurePluginsLoaded();
   return getPlugin(slug);
 }
@@ -106,6 +111,7 @@ export async function updatePluginSettings(
     .set({ settings: { ...existing.settings, ...clean } })
     .where(eq(plugins.slug, slug));
   invalidatePluginCache();
+  pluginsReady = false;
   await ensurePluginsLoaded();
   return getPlugin(slug);
 }
@@ -113,19 +119,34 @@ export async function updatePluginSettings(
 /**
  * Ensure every enabled plugin has been imported and had its hooks registered.
  * Call this at the top of any request path that renders content or fires hooks.
+ *
+ * Warm requests cost nothing: after the first successful load a process-local
+ * flag short-circuits until something mutates plugins (enable/disable/settings
+ * save), and concurrent cold requests coalesce onto one in-flight promise.
  */
-export async function ensurePluginsLoaded(): Promise<void> {
-  await ensureBootstrap();
-  const rows = await db
-    .select({ slug: plugins.slug, settings: plugins.settings, enabled: plugins.enabled })
-    .from(plugins)
-    .where(eq(plugins.enabled, true));
-  const manifests = new Map(discoverPlugins().map((m) => [m.slug, m]));
-  const enabled = rows
-    .filter((r) => manifests.has(r.slug))
-    .map((r) => ({
-      slug: r.slug,
-      settings: resolveSettings(manifests.get(r.slug)?.settings ?? [], r.settings),
-    }));
-  await loadPlugins(enabled);
+let pluginsReady = false;
+let pluginsInflight: Promise<void> | null = null;
+
+export function ensurePluginsLoaded(): Promise<void> {
+  if (pluginsReady) return Promise.resolve();
+  if (pluginsInflight) return pluginsInflight;
+  pluginsInflight = (async () => {
+    await ensureBootstrap();
+    const rows = await db
+      .select({ slug: plugins.slug, settings: plugins.settings, enabled: plugins.enabled })
+      .from(plugins)
+      .where(eq(plugins.enabled, true));
+    const manifests = new Map(discoverPlugins().map((m) => [m.slug, m]));
+    const enabled = rows
+      .filter((r) => manifests.has(r.slug))
+      .map((r) => ({
+        slug: r.slug,
+        settings: resolveSettings(manifests.get(r.slug)?.settings ?? [], r.settings),
+      }));
+    await loadPlugins(enabled);
+    pluginsReady = true;
+  })().finally(() => {
+    pluginsInflight = null;
+  });
+  return pluginsInflight;
 }

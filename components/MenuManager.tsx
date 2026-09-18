@@ -96,13 +96,13 @@ export default function MenuManager() {
       list = (data.items ?? []).map((p: any) => ({
         id: p.id,
         label: p.title,
-        url: type === "post" ? `/blog/${p.slug}` : `/${p.slug}`,
+        url: p.url,
       }));
     } else {
       list = (data ?? []).map((t: any) => ({
         id: t.id,
         label: t.name,
-        url: type === "category" ? `/blog/category/${t.slug}` : `/blog/tag/${t.slug}`,
+        url: t.url,
       }));
     }
     setOptions((o) => ({ ...o, [type]: list }));

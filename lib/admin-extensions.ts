@@ -10,6 +10,7 @@ import {
   Shield,
   Boxes,
   LayoutGrid,
+  Pin,
 } from "lucide-react";
 
 /** Serializable description added to the admin sidebar via the `admin.menu` hook.
@@ -46,4 +47,5 @@ export const ADMIN_ICONS: Record<string, LucideIcon> = {
   shield: Shield,
   boxes: Boxes,
   layoutgrid: LayoutGrid,
+  pin: Pin,
 };

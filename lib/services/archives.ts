@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { postCategories, postTags, posts } from "@/db/schema";
 import { ensureBootstrap } from "./bootstrap";
+import { getPermalinkConfig, postUrlFor } from "./links";
 
 /**
  * Archive index + related-posts queries.
@@ -73,6 +74,8 @@ export type ArchiveEntry = {
   publishedAt: Date | null;
   format: string;
   views: number;
+  /** Public URL under the current permalink config. */
+  url: string;
 };
 
 /** Flat list of every published post, newest first — the /archives timeline. */
@@ -86,19 +89,23 @@ export async function listArchiveEntries(opts: {
   if (opts.year) conditions.push(sql`EXTRACT(YEAR FROM ${posts.publishedAt}) = ${opts.year}`);
   if (opts.month) conditions.push(sql`EXTRACT(MONTH FROM ${posts.publishedAt}) = ${opts.month}`);
 
-  return db
-    .select({
-      id: posts.id,
-      title: posts.title,
-      slug: posts.slug,
-      publishedAt: posts.publishedAt,
-      format: posts.format,
-      views: posts.views,
-    })
-    .from(posts)
-    .where(and(...conditions))
-    .orderBy(desc(posts.publishedAt))
-    .limit(Math.min(opts.limit ?? 2000, 5000));
+  const [rows, cfg] = await Promise.all([
+    db
+      .select({
+        id: posts.id,
+        title: posts.title,
+        slug: posts.slug,
+        publishedAt: posts.publishedAt,
+        format: posts.format,
+        views: posts.views,
+      })
+      .from(posts)
+      .where(and(...conditions))
+      .orderBy(desc(posts.publishedAt))
+      .limit(Math.min(opts.limit ?? 2000, 5000)),
+    getPermalinkConfig(),
+  ]);
+  return rows.map((p) => ({ ...p, url: postUrlFor(cfg, p) }));
 }
 
 /**
@@ -108,18 +115,30 @@ export async function listArchiveEntries(opts: {
  * a stronger signal than tags). Ties break on recency. Falls back to the latest
  * posts when a post has no terms at all, so the section is never empty.
  */
+export type RelatedPost = {
+  id: number;
+  title: string;
+  slug: string;
+  publishedAt: Date | null;
+  featuredImage: string | null;
+  score: number;
+  /** Public URL under the current permalink config. */
+  url: string;
+};
+
 export async function getRelatedPosts(
   postId: number,
   limit = 4,
-): Promise<{ id: number; title: string; slug: string; publishedAt: Date | null; featuredImage: string | null; score: number }[]> {
+): Promise<RelatedPost[]> {
   await ensureBootstrap();
 
-  const [catRows, tagRows] = await Promise.all([
+  const [catRows, tagRows, cfg] = await Promise.all([
     db
       .select({ id: postCategories.categoryId })
       .from(postCategories)
       .where(eq(postCategories.postId, postId)),
     db.select({ id: postTags.tagId }).from(postTags).where(eq(postTags.postId, postId)),
+    getPermalinkConfig(),
   ]);
   const catIds = catRows.map((r) => r.id);
   const tagIds = tagRows.map((r) => r.id);
@@ -137,7 +156,7 @@ export async function getRelatedPosts(
       .where(and(eq(posts.status, "published"), sql`${posts.id} <> ${postId}`))
       .orderBy(desc(posts.publishedAt))
       .limit(limit);
-    return fallback.map((p) => ({ ...p, score: 0 }));
+    return fallback.map((p) => ({ ...p, score: 0, url: postUrlFor(cfg, p) }));
   }
 
   // Two cheap membership queries beat one giant join for a handful of terms.
@@ -180,7 +199,7 @@ export async function getRelatedPosts(
     .where(and(eq(posts.status, "published"), inArray(posts.id, candidateIds)));
 
   return rows
-    .map((p) => ({ ...p, score: score.get(p.id) ?? 0 }))
+    .map((p) => ({ ...p, score: score.get(p.id) ?? 0, url: postUrlFor(cfg, p) }))
     .sort(
       (a, b) =>
         b.score - a.score ||

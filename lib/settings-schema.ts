@@ -17,6 +17,7 @@ export type FieldType =
   | "links" // repeatable {label,url} list
   | "footerLinks" // repeatable {text,url,image?} list — footer links
   | "categoryRows" // repeatable {slug,title} list — homepage category sections
+  | "hidden" // stored but never rendered — plugin custom panels own the UI
   | "group"; // visual sub-heading, no value
 
 /** One row of a `categoryRows` field: a category plus optional title override. */
@@ -93,6 +94,10 @@ export function coerceField(field: SettingField, raw: unknown): unknown {
     }
     case "switch":
       return raw === true || raw === "true" || raw === "on" || raw === 1;
+    case "hidden":
+      // Stored verbatim (arrays / objects) — the field exists only so plugin
+      // settings persistence keeps keys owned by a custom admin panel.
+      return raw;
     case "links":
       return Array.isArray(raw) ? raw : [];
     case "footerLinks":

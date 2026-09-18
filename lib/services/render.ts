@@ -42,6 +42,7 @@ function resolvers(): ShortcodeResolvers {
       return items.map((p) => ({
         title: p.title,
         slug: p.slug,
+        url: p.url,
         excerpt: p.excerpt,
         publishedAt: p.publishedAt,
       }));

@@ -17,21 +17,21 @@ export async function GET(req: Request) {
   const base = new URL(req.url).origin;
   const [settings, posts, pages] = await Promise.all([
     getSettings(),
-    listPosts({ status: "published", limit: 20 }),
+    listPosts({ status: "published", limit: 20, pinned: false }),
     listPages({ status: "published", limit: 20 }),
   ]);
 
   const items: string[] = [];
   for (const p of posts.items) {
     items.push(
-      `    <item>\n      <title>${escapeXml(p.title)}</title>\n      <link>${base}/blog/${p.slug}</link>\n      <guid>${base}/blog/${p.slug}</guid>\n      <pubDate>${
+      `    <item>\n      <title>${escapeXml(p.title)}</title>\n      <link>${base}${p.url}</link>\n      <guid>${base}${p.url}</guid>\n      <pubDate>${
         p.publishedAt ? new Date(p.publishedAt).toUTCString() : new Date().toUTCString()
       }</pubDate>\n      <description>${escapeXml(p.excerpt ?? "")}</description>\n    </item>`,
     );
   }
   for (const p of pages.items) {
     items.push(
-      `    <item>\n      <title>${escapeXml(p.title)}</title>\n      <link>${base}/${p.slug}</link>\n      <guid>${base}/${p.slug}</guid>\n      <pubDate>${
+      `    <item>\n      <title>${escapeXml(p.title)}</title>\n      <link>${base}${p.url}</link>\n      <guid>${base}${p.url}</guid>\n      <pubDate>${
         p.publishedAt ? new Date(p.publishedAt).toUTCString() : new Date().toUTCString()
       }</pubDate>\n      <description>${escapeXml(p.excerpt ?? "")}</description>\n    </item>`,
     );

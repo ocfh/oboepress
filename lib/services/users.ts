@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { db, ensureMigrations } from "@/db";
 import { users } from "@/db/schema";
 import type { User } from "@/db/schema";
@@ -87,6 +87,9 @@ export type UserUpdate = {
   password?: string;
   role?: User["role"];
   email?: string;
+  /** "" or null clears the phone. */
+  phone?: string | null;
+  status?: User["status"];
 };
 
 export async function updateUser(
@@ -100,10 +103,24 @@ export async function updateUser(
   const isSelf = actor.id === id;
   const managing = can(actor.role, "users:manage");
 
-  // Role / email changes require admin-level management rights.
-  if ((input.role !== undefined || input.email !== undefined) && !managing)
-    throw new ForbiddenError("无权修改角色或邮箱");
+  // Role / email / ban changes require admin-level management rights.
+  if (
+    (input.role !== undefined ||
+      input.email !== undefined ||
+      input.status !== undefined) &&
+    !managing
+  )
+    throw new ForbiddenError("无权修改角色、邮箱或账号状态");
   if (!isSelf && !managing) throw new ForbiddenError("无权修改其他用户");
+
+  const phone = input.phone === undefined ? target.phone : input.phone || null;
+  if (phone && phone !== target.phone) {
+    const [taken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, phone), ne(users.id, id)));
+    if (taken) throw new ValidationError("手机号已被其他账号使用");
+  }
 
   const [row] = await db
     .update(users)
@@ -112,6 +129,8 @@ export async function updateUser(
       bio: input.bio !== undefined ? input.bio : target.bio,
       email: input.email ?? target.email,
       role: input.role ?? target.role,
+      phone,
+      status: input.status ?? target.status,
       passwordHash: input.password
         ? await hashPassword(input.password)
         : target.passwordHash,

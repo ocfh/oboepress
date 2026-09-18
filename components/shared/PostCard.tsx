@@ -7,7 +7,7 @@ export default function PostCard({ post }: { post: PostListItem }) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] transition hover:-translate-y-0.5 hover:border-[var(--accent)]">
       {post.featuredImage ? (
-        <Link href={`/blog/${post.slug}`} className="block aspect-[16/9] overflow-hidden">
+        <Link href={post.url} className="block aspect-[16/9] overflow-hidden">
           <img
             src={post.featuredImage}
             alt={post.title}
@@ -21,7 +21,7 @@ export default function PostCard({ post }: { post: PostListItem }) {
           {post.categories.slice(0, 2).map((c) => (
             <Link
               key={c.id}
-              href={`/blog/category/${c.slug}`}
+              href={c.url}
               className="rounded-full bg-[var(--accent)]/15 px-2.5 py-0.5 text-[var(--accent)]"
             >
               {c.name}
@@ -29,7 +29,7 @@ export default function PostCard({ post }: { post: PostListItem }) {
           ))}
         </div>
         <h2 className="text-lg font-semibold leading-snug text-zinc-100">
-          <Link href={`/blog/${post.slug}`} className="transition group-hover:text-[var(--accent)]">
+          <Link href={post.url} className="transition group-hover:text-[var(--accent)]">
             {post.title}
           </Link>
         </h2>

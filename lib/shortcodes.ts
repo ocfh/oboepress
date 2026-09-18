@@ -25,7 +25,7 @@ export interface ShortcodeResolvers {
     category?: string;
     tag?: string;
     order?: string;
-  }) => Promise<{ title: string; slug: string; excerpt?: string | null; publishedAt?: Date | null }[]>;
+  }) => Promise<{ title: string; slug: string; url: string; excerpt?: string | null; publishedAt?: Date | null }[]>;
 }
 
 export interface ShortcodeDefinition {
@@ -344,8 +344,8 @@ function registerBuiltins() {
       const rows = items
         .map(
           (p) =>
-            `<li style="padding:.5rem 0;border-bottom:1px solid var(--border)"><a href="/blog/${esc(
-              p.slug,
+            `<li style="padding:.5rem 0;border-bottom:1px solid var(--border)"><a href="${esc(
+              p.url,
             )}" style="color:var(--text);text-decoration:none">${esc(p.title)}</a>${
               p.publishedAt
                 ? `<span style="float:right;font-size:.8rem;color:var(--muted)">${new Date(

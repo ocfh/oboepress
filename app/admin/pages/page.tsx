@@ -70,7 +70,7 @@ export default async function PagesAdmin() {
                 <td className="px-4 py-3 text-zinc-500">{formatDate(p.updatedAt)}</td>
                 <td className="px-4 py-3 text-right">
                   <Link
-                    href={`/pages/${p.slug}`}
+                    href={p.url}
                     target="_blank"
                     className="mr-2 inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-indigo-400"
                     title="查看"

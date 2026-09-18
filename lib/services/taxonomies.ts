@@ -7,14 +7,24 @@ import type { CategoryInput, TagInput } from "@/lib/validation";
 import { can } from "@/lib/rbac";
 import { slugify, uniqueSlug } from "@/lib/utils";
 import { ForbiddenError, NotFoundError } from "./errors";
+import { getPermalinkConfig, categoryUrlFor, tagUrlFor } from "./links";
+
+/** Category row plus its public URL under the current permalink config. */
+export type CategoryWithUrl = Category & { url: string };
+/** Tag row plus its public URL under the current permalink config. */
+export type TagWithUrl = Tag & { url: string };
 
 // ---------- Categories ----------
 
-export async function listCategories(): Promise<Category[]> {
-  return db
-    .select()
-    .from(categories)
-    .orderBy(categories.order, desc(categories.createdAt));
+export async function listCategories(): Promise<CategoryWithUrl[]> {
+  const [rows, cfg] = await Promise.all([
+    db
+      .select()
+      .from(categories)
+      .orderBy(categories.order, desc(categories.createdAt)),
+    getPermalinkConfig(),
+  ]);
+  return rows.map((c) => ({ ...c, url: categoryUrlFor(cfg, c) }));
 }
 
 export async function getCategory(id: number): Promise<Category> {
@@ -118,8 +128,12 @@ export async function reorderCategories(
 
 // ---------- Tags ----------
 
-export async function listTags(): Promise<Tag[]> {
-  return db.select().from(tags).orderBy(desc(tags.id));
+export async function listTags(): Promise<TagWithUrl[]> {
+  const [rows, cfg] = await Promise.all([
+    db.select().from(tags).orderBy(desc(tags.id)),
+    getPermalinkConfig(),
+  ]);
+  return rows.map((t) => ({ ...t, url: tagUrlFor(cfg, t) }));
 }
 
 export async function getTag(id: number): Promise<Tag> {

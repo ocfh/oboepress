@@ -16,6 +16,13 @@ import { getWidgetType, WIDGET_TYPES, type WidgetTypeDef } from "@/lib/widgets/r
 import { ensureBootstrap } from "./bootstrap";
 import { ensurePluginsLoaded } from "./plugins";
 import { NotFoundError, ValidationError } from "./errors";
+import {
+  getPermalinkConfig,
+  postUrlFor,
+  categoryUrlFor,
+  tagUrlFor,
+  type PermalinkConfig,
+} from "./links";
 
 export type WidgetInput = {
   area: string;
@@ -137,6 +144,7 @@ export async function getAreaWidgets(
     )
     .orderBy(asc(widgets.order));
 
+  const cfg = await getPermalinkConfig();
   const out: ResolvedWidget[] = [];
   for (const w of rows) {
     const def = getWidgetType(w.type);
@@ -146,10 +154,22 @@ export async function getAreaWidgets(
       type: w.type,
       title: w.title,
       config,
-      data: await resolveWidgetData(w.type, config),
+      data: withWidgetUrls(w.type, await resolveWidgetData(w.type, config), cfg),
     });
   }
   return out;
+}
+
+/** Attach public URLs to entity rows carried by link-producing widgets. */
+function withWidgetUrls(type: string, data: unknown, cfg: PermalinkConfig): unknown {
+  if (!Array.isArray(data)) return data;
+  if (type === "recent-posts" || type === "popular-posts")
+    return data.map((r: { id: number; slug: string }) => ({ ...r, url: postUrlFor(cfg, r) }));
+  if (type === "categories")
+    return data.map((r: { slug: string }) => ({ ...r, url: categoryUrlFor(cfg, r) }));
+  if (type === "tag-cloud")
+    return data.map((r: { slug: string }) => ({ ...r, url: tagUrlFor(cfg, r) }));
+  return data;
 }
 
 async function resolveWidgetData(

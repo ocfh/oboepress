@@ -41,7 +41,7 @@ export default async function Sidebar() {
           {cats.map((c) => (
             <li key={c.id}>
               <Link
-                href={`/blog/category/${c.slug}`}
+                href={c.url}
                 className="flex items-center gap-1.5 text-zinc-300 hover:text-[var(--accent)]"
               >
                 {showCatIcons ? (
@@ -64,7 +64,7 @@ export default async function Sidebar() {
           {tags.map((t) => (
             <Link
               key={t.id}
-              href={`/blog/tag/${t.slug}`}
+              href={t.url}
               className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-zinc-300 hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               #{t.name}
@@ -82,7 +82,7 @@ export default async function Sidebar() {
         <ul className="space-y-2 text-sm">
           {recent.items.map((p) => (
             <li key={p.id}>
-              <Link href={`/blog/${p.slug}`} className="text-zinc-300 hover:text-[var(--accent)]">
+              <Link href={p.url} className="text-zinc-300 hover:text-[var(--accent)]">
                 {p.title}
               </Link>
               <p className="text-xs text-zinc-500">{formatDate(p.publishedAt)}</p>

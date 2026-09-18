@@ -36,6 +36,50 @@ let driver: Driver = (process.env.DB_DRIVER || "pglite") as Driver;
 let pgliteClient: PGlite | null = null;
 let postgresClient: ReturnType<typeof postgres> | null = null;
 
+/**
+ * Remove crash-residue Postgres lock files before (re)opening an embedded
+ * data directory. PGlite is an in-process single-tenant Postgres: when a
+ * fresh process is constructing a client, no other postmaster can possibly be
+ * running against this directory, so an existing postmaster.pid / socket lock
+ * always means the previous process was killed hard. Opening the directory
+ * without removing them aborts the WASM runtime ("Aborted()" at _pg_initdb).
+ */
+function sweepStalePgLocks(dataDir: string): void {
+  try {
+    if (!fs.existsSync(path.join(dataDir, "postmaster.pid"))) return;
+    for (const name of fs.readdirSync(dataDir)) {
+      if (name === "postmaster.pid" || name.startsWith(".s.PGSQL.")) {
+        fs.rmSync(path.join(dataDir, name), { force: true });
+      }
+    }
+  } catch {
+    // Best-effort cleanup; the PGlite constructor still surfaces a real error.
+  }
+}
+
+/**
+ * Flush + release the embedded database when the process is asked to stop, so
+ * a normal `next dev` shutdown never leaves half-written WAL / lock files
+ * behind (which is what previously forced repeated data-directory rebuilds).
+ * Registered once across dev hot-reloads via a global guard.
+ */
+function registerGracefulShutdown(): void {
+  const g = globalThis as unknown as { __oboeDbShutdown?: boolean };
+  if (g.__oboeDbShutdown) return;
+  g.__oboeDbShutdown = true;
+  let closing = false;
+  const flush = () => {
+    if (closing) return;
+    closing = true;
+    // Fire-and-forget: do not block or re-exit; the runtime's own signal
+    // handling owns process termination.
+    pgliteClient?.close().catch(() => {});
+  };
+  process.once("SIGINT", flush);
+  process.once("SIGTERM", flush);
+  process.once("beforeExit", flush);
+}
+
 function createDb(): Database {
   driver = (process.env.DB_DRIVER || "pglite") as Driver;
 
@@ -62,8 +106,14 @@ function createDb(): Database {
   // PGlite's own directory creation is not recursive; make sure the parent
   // data directory exists so the first launch is truly zero-config.
   fs.mkdirSync(path.dirname(path.resolve(url)), { recursive: true });
-  const client = new PGlite(url);
+  sweepStalePgLocks(path.resolve(url));
+  // relaxedDurability skips fsync on every transaction: the embedded local
+  // store is disposable/dev-grade (production uses the postgres driver), and
+  // fewer filesystem syncs both speed up writes and shrink the window in
+  // which a hard process kill can tear the data directory.
+  const client = new PGlite(url, { relaxedDurability: true });
   pgliteClient = client;
+  registerGracefulShutdown();
   // drizzle-orm/pglite returns a PgDatabase-compatible instance; the query API
   // is identical to the postgres-js one, so we unify the type for callers.
   return drizzlePglite(client, { schema }) as unknown as Database;

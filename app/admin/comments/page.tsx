@@ -23,6 +23,7 @@ type Comment = {
   status: "published" | "pending" | "spam";
   createdAt: string;
   ip: string | null;
+  postUrl?: string | null;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -176,12 +177,19 @@ export default function CommentsAdmin() {
                   >
                     {STATUS_LABEL[c.status]}
                   </span>
-                  <Link
-                    href={c.postType === "page" ? `/${c.postId}` : `/blog/${c.postId}`}
-                    className="text-xs text-indigo-400 hover:underline"
-                  >
-                    #{c.postId}
-                  </Link>
+                  {c.postUrl ? (
+                    <Link
+                      href={c.postUrl}
+                      target="_blank"
+                      className="text-xs text-indigo-400 hover:underline"
+                    >
+                      #{c.postId}
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-zinc-500" title="内容不存在或未发布">
+                      #{c.postId}
+                    </span>
+                  )}
                   <span className="text-xs text-zinc-500">
                     {new Date(c.createdAt).toLocaleString("zh-CN")}
                   </span>

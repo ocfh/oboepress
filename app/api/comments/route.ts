@@ -1,6 +1,8 @@
 import { authenticate, authorize, handleError, ok, readJson } from "@/lib/http";
 import { getSession } from "@/lib/auth";
 import { listComments, createComment } from "@/lib/services/comments";
+import { getPostById } from "@/lib/services/posts";
+import { getPageById } from "@/lib/services/pages";
 import { commentInputSchema } from "@/lib/validation";
 
 export const runtime = "nodejs";
@@ -25,7 +27,7 @@ export async function GET(req: Request) {
       if (denied) return denied;
     }
 
-    const { items, total } = await listComments({
+    let { items, total } = await listComments({
       postId: post ? Number(post) : undefined,
       postType,
       status: isModerator ? status ?? undefined : status ?? "published",
@@ -33,6 +35,18 @@ export async function GET(req: Request) {
       limit: 200,
       order: "asc",
     });
+    // 后台评论列表需要「查看被评论内容」的真实链接；公开调用不附带，省一次批量解析。
+    if (isModerator && items.length) {
+      const postIds = [...new Set(items.filter((c) => c.postType !== "page").map((c) => c.postId))];
+      const pageIds = [...new Set(items.filter((c) => c.postType === "page").map((c) => c.postId))];
+      const [postRows, pageRows] = await Promise.all([
+        Promise.all(postIds.map(async (id) => [id, await getPostById(id, true).catch(() => null)] as const)),
+        Promise.all(pageIds.map(async (id) => [id, await getPageById(id, true).catch(() => null)] as const)),
+      ]);
+      const urlById = new Map<number, string>();
+      for (const [id, row] of [...postRows, ...pageRows]) if (row) urlById.set(id, row.url);
+      items = items.map((c) => ({ ...c, postUrl: urlById.get(c.postId) ?? null }));
+    }
     return ok({ items, total });
   } catch (e) {
     return handleError(e);

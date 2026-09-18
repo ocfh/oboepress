@@ -100,7 +100,7 @@ export default async function ArchivesPage({
                   return (
                     <li key={p.id}>
                       <Link
-                        href={`/blog/${p.slug}`}
+                        href={p.url}
                         className="group flex items-baseline gap-3 rounded-md px-2 py-1.5 transition"
                         style={{ color: "var(--text)" }}
                       >
