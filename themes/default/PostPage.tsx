@@ -8,7 +8,6 @@ import {
   renderContent,
   renderPlainText,
   buildPostMeta,
-  buildHeadNodes,
 } from "@/lib/services/render";
 import Comments from "@/components/shared/Comments";
 import Sidebar from "@/components/shared/Sidebar";
@@ -52,33 +51,11 @@ export default async function OboePressPostPage({ params }: { params: { slug: st
   const plain = renderPlainText(post.content);
   // Plugins append rows (e.g. reading-time) to the post meta line.
   const meta = await buildPostMeta(post, plain);
-  // Plugins inject <head> nodes (e.g. seo-schema JSON-LD).
-  const heads = await buildHeadNodes({
-    kind: "post",
-    siteTitle: settings.siteTitle,
-    siteUrl: process.env.NEXT_PUBLIC_SITE_URL || "",
-    title: post.title,
-    description: post.excerpt ?? "",
-    url: canonical,
-    image: post.featuredImage ?? undefined,
-    publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
-    author: post.author?.name,
-    breadcrumbs: [
-      { label: "首页", href: "/" },
-      { label: "文章", href: "/blog" },
-      ...post.categories.slice(0, 1).map((c) => ({
-        label: c.name,
-        href: `/blog/category/${c.slug}`,
-      })),
-      { label: post.title, href: canonical },
-    ],
-  });
+  // Plugin <head> nodes (e.g. seo-schema JSON-LD) are emitted once by the
+  // public catch-all page, not per theme.
 
   return (
     <>
-      {heads.length > 0 && (
-        <div dangerouslySetInnerHTML={{ __html: heads.join("\n") }} />
-      )}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">
         <article>
           <header className="mb-6">

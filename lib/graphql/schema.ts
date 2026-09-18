@@ -110,6 +110,7 @@ const typeDefs = /* GraphQL */ `
     featuredImage: String
     seoTitle: String
     seoDescription: String
+    seoKeywords: String
     author: User
     categories: [Category!]!
     tags: [Tag!]!
@@ -128,6 +129,7 @@ const typeDefs = /* GraphQL */ `
     featuredImage: String
     seoTitle: String
     seoDescription: String
+    seoKeywords: String
     parentId: Int
     publishedAt: DateTime
     createdAt: DateTime
@@ -157,6 +159,7 @@ const typeDefs = /* GraphQL */ `
     featuredImage: String
     seoTitle: String
     seoDescription: String
+    seoKeywords: String
     authorId: Int
     categoryIds: [Int!]
     tagIds: [Int!]
@@ -171,6 +174,7 @@ const typeDefs = /* GraphQL */ `
     featuredImage: String
     seoTitle: String
     seoDescription: String
+    seoKeywords: String
     parentId: Int
     categoryIds: [Int!]
     tagIds: [Int!]

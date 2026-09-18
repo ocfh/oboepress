@@ -44,16 +44,43 @@ let postgresClient: ReturnType<typeof postgres> | null = null;
  * always means the previous process was killed hard. Opening the directory
  * without removing them aborts the WASM runtime ("Aborted()" at _pg_initdb).
  */
+/**
+ * True when a process with `pid` currently exists. signal 0 performs no
+ * actual signal; ESRCH means gone, EPERM (Windows: access denied) still
+ * proves the PID is live (and therefore must not be treated as stale).
+ */
+function pidIsAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
 function sweepStalePgLocks(dataDir: string): void {
   try {
-    if (!fs.existsSync(path.join(dataDir, "postmaster.pid"))) return;
+    const pidFile = path.join(dataDir, "postmaster.pid");
+    if (!fs.existsSync(pidFile)) return;
+    // A live owner means another dev/server process has THIS directory open.
+    // Sweeping its locks and opening a second PGlite corrupts the pgdata
+    // (WASM "Aborted()"), so fail loudly instead of "helpfully" destroying it.
+    const holderPid = Number.parseInt(fs.readFileSync(pidFile, "utf8").split(/\r?\n/)[0] || "", 10);
+    if (holderPid && pidIsAlive(holderPid)) {
+      throw new Error(
+        `PGlite data directory ${dataDir} is already in use by process ${holderPid}. ` +
+          "Stop the other server (only one `next dev` can open this embedded DB) and retry. " +
+          "If no server is actually running, delete postmaster.pid in that folder manually.",
+      );
+    }
     for (const name of fs.readdirSync(dataDir)) {
       if (name === "postmaster.pid" || name.startsWith(".s.PGSQL.")) {
         fs.rmSync(path.join(dataDir, name), { force: true });
       }
     }
-  } catch {
-    // Best-effort cleanup; the PGlite constructor still surfaces a real error.
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("PGlite data directory")) throw err;
+    // Any other cleanup failure is best-effort; PGlite surfaces the real error.
   }
 }
 

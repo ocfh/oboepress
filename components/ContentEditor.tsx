@@ -27,6 +27,7 @@ export type EditorInitial = {
   featuredImage: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
+  seoKeywords: string | null;
   commentStatus?: string;
   authorId?: number | null;
   parentId?: number | null;
@@ -66,6 +67,7 @@ export default function ContentEditor({
   const [featuredImage, setFeaturedImage] = useState(initial?.featuredImage ?? "");
   const [seoTitle, setSeoTitle] = useState(initial?.seoTitle ?? "");
   const [seoDescription, setSeoDescription] = useState(initial?.seoDescription ?? "");
+  const [seoKeywords, setSeoKeywords] = useState(initial?.seoKeywords ?? "");
   const [authorId, setAuthorId] = useState<number | "">(initial?.authorId ?? "");
   const [parentId, setParentId] = useState<number | "">(initial?.parentId ?? "");
   const [categoryIds, setCategoryIds] = useState<number[]>(initial?.categoryIds ?? []);
@@ -118,6 +120,7 @@ export default function ContentEditor({
       featuredImage: featuredImage || undefined,
       seoTitle: seoTitle || undefined,
       seoDescription: seoDescription || undefined,
+      seoKeywords: seoKeywords || undefined,
       commentStatus,
       metas: metas.filter((m) => m.key.trim().length > 0),
     };
@@ -486,6 +489,12 @@ export default function ContentEditor({
               placeholder="SEO 描述"
               rows={2}
               className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm outline-none focus:border-indigo-500"
+            />
+            <input
+              value={seoKeywords}
+              onChange={(e) => setSeoKeywords(e.target.value)}
+              placeholder="SEO 关键词，逗号分隔"
+              className="mt-2 w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </div>
 

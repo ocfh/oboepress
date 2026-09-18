@@ -233,13 +233,19 @@ export async function listPosts(opts: PostQuery = {}): Promise<{
     authorId: number | null;
   };
 
-  // First page: pull floating posts in the plugin-defined order.
+  // The merged stream is [floating posts in plugin order] followed by
+  // [normal posts under the archive order]. Slice it generically so a pinned
+  // set larger than one page keeps flowing onto later pages instead of the
+  // overflow ids being excluded everywhere (every pinned id appears exactly
+  // once; normal rows always exclude the whole floating set).
   let pinnedRows: JoinedRow[] = [];
   let normalLimit = limit;
   let normalOffset = offset;
   if (floatingIds.length) {
-    if (offset === 0) {
-      const want = floatingIds.slice(0, limit);
+    const floatStart = offset;
+    const floatEnd = Math.min(floatingIds.length, offset + limit);
+    if (floatEnd > floatStart) {
+      const want = floatingIds.slice(floatStart, floatEnd);
       const found = await db
         .select(rowShape)
         .from(posts)
@@ -249,11 +255,9 @@ export async function listPosts(opts: PostQuery = {}): Promise<{
       pinnedRows = want
         .map((id) => byId.get(id))
         .filter((r): r is JoinedRow => Boolean(r));
-      normalLimit = limit - pinnedRows.length;
-    } else {
-      // The floating block consumed slots on page one — shift later pages back.
-      normalOffset = Math.max(0, offset - floatingIds.length);
     }
+    normalLimit = limit - pinnedRows.length;
+    normalOffset = Math.max(0, offset - floatingIds.length);
   }
 
   const normalRows: JoinedRow[] =
@@ -431,6 +435,7 @@ export async function createPost(user: SessionUser, input: PostInput) {
       featuredImage: input.featuredImage || null,
       seoTitle: input.seoTitle,
       seoDescription: input.seoDescription,
+      seoKeywords: input.seoKeywords,
       commentStatus: input.commentStatus ?? "open",
       authorId,
       publishedAt: input.publishedAt
@@ -504,6 +509,7 @@ export async function updatePost(
       seoTitle: input.seoTitle !== undefined ? input.seoTitle : existing.seoTitle,
       seoDescription:
         input.seoDescription !== undefined ? input.seoDescription : existing.seoDescription,
+      seoKeywords: input.seoKeywords !== undefined ? input.seoKeywords : existing.seoKeywords,
       commentStatus: input.commentStatus ?? existing.commentStatus,
       publishedAt,
       format: input.format ?? existing.format,

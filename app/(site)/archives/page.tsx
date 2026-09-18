@@ -12,8 +12,9 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
   const settings = await getSettings();
+  // Bare title — the root title template appends the site name itself.
   return {
-    title: `文章归档 - ${settings.siteTitle}`,
+    title: "文章归档",
     description: `${settings.siteTitle} 的全部文章按时间归档`,
   };
 }

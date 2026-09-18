@@ -29,6 +29,7 @@ export default async function EditPage({
         featuredImage: page.featuredImage,
         seoTitle: page.seoTitle,
         seoDescription: page.seoDescription,
+        seoKeywords: page.seoKeywords,
         commentStatus: page.commentStatus,
         parentId: page.parentId,
         metas: Object.entries(page.metas ?? {}).map(([key, value]) => ({ key, value })),

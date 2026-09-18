@@ -44,6 +44,7 @@ export default async function EditPost({
         featuredImage: post.featuredImage,
         seoTitle: post.seoTitle,
         seoDescription: post.seoDescription,
+        seoKeywords: post.seoKeywords,
         commentStatus: post.commentStatus,
         authorId: post.author?.id ?? null,
         categoryIds: post.categories.map((c) => c.id),

@@ -98,6 +98,7 @@ export async function createPage(user: SessionUser, input: PageInput): Promise<P
       featuredImage: input.featuredImage || null,
       seoTitle: input.seoTitle,
       seoDescription: input.seoDescription,
+      seoKeywords: input.seoKeywords,
       commentStatus: input.commentStatus ?? "open",
       parentId: input.parentId ?? null,
       publishedAt: input.publishedAt
@@ -154,6 +155,7 @@ export async function updatePage(
         input.seoDescription !== undefined
           ? input.seoDescription
           : existing.seoDescription,
+      seoKeywords: input.seoKeywords !== undefined ? input.seoKeywords : existing.seoKeywords,
       commentStatus: input.commentStatus ?? existing.commentStatus,
       parentId: input.parentId !== undefined ? input.parentId ?? null : existing.parentId,
       publishedAt,

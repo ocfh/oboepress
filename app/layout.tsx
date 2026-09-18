@@ -6,15 +6,14 @@ import { getActiveTheme } from "@/lib/services/themes";
 import { themeToCss } from "@/lib/theme";
 import { loadThemeModule } from "@/themes/registry";
 import { buildFooterHtml } from "@/lib/services/render";
+import { buildSiteMetadata, analyticsSnippet } from "@/lib/services/seo";
+import RawInjection from "@/components/RawInjection";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSettings();
-  return {
-    title: { default: settings.siteTitle, template: `%s | ${settings.siteTitle}` },
-    description: settings.siteDescription,
-  };
+  return buildSiteMetadata(settings);
 }
 
 export default async function RootLayout({
@@ -50,16 +49,25 @@ export default async function RootLayout({
   // Plugins that ship footer markup (e.g. code-copy) are injected here so they
   // run on every public page regardless of which theme is active.
   const footerHtml = await buildFooterHtml();
+  // Site-wide custom code: head injection at body open, footer injection plus
+  // analytics at body end. RawInjection keeps the markup in SSR source (so
+  // crawlers see it) and clones <script> nodes so they actually execute.
+  const headInject = settings.customHead || "";
+  const footInject = [footerHtml, settings.customFooter, analyticsSnippet(settings)]
+    .filter(Boolean)
+    .join("\n");
 
   if (!themeModule) {
     return (
       <html lang="zh-CN">
         <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
           <style id="oboe-theme" dangerouslySetInnerHTML={{ __html: `:root{${css}}` }} />
-          <div>无法加载主题</div>
-          {footerHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: footerHtml }} />
+          {settings.customCss ? (
+            <style id="oboe-custom-css" dangerouslySetInnerHTML={{ __html: settings.customCss }} />
           ) : null}
+          {headInject ? <RawInjection html={headInject} /> : null}
+          <div>无法加载主题</div>
+          {footInject ? <RawInjection id="oboe-footer-hooks" html={footInject} /> : null}
         </body>
       </html>
     );
@@ -70,10 +78,12 @@ export default async function RootLayout({
     <html lang="zh-CN">
       <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
         <style id="oboe-theme" dangerouslySetInnerHTML={{ __html: `:root{${css}}` }} />
-        <PublicLayout siteTitle={settings.siteTitle}>{children}</PublicLayout>
-        {footerHtml ? (
-          <div id="oboe-footer-hooks" dangerouslySetInnerHTML={{ __html: footerHtml }} />
+        {settings.customCss ? (
+          <style id="oboe-custom-css" dangerouslySetInnerHTML={{ __html: settings.customCss }} />
         ) : null}
+        {headInject ? <RawInjection html={headInject} /> : null}
+        <PublicLayout siteTitle={settings.siteTitle}>{children}</PublicLayout>
+        {footInject ? <RawInjection id="oboe-footer-hooks" html={footInject} /> : null}
       </body>
     </html>
   );
