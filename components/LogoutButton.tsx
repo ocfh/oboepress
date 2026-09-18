@@ -10,8 +10,10 @@ export default function LogoutButton() {
 
   async function logout() {
     setLoading(true);
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/admin/login");
+    const res = await fetch("/api/auth/logout", { method: "POST" });
+    const data = await res.json().catch(() => null);
+    // 伪装开启时 /admin/login 已 404，登出后回到秘密入口。
+    router.push(data?.entryEnabled ? data.entryPath : "/admin/login");
     router.refresh();
   }
 

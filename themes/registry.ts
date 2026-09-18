@@ -103,31 +103,46 @@ export const BASE_WIDGET_AREAS: ThemeWidgetArea[] = [
 /**
  * Scan the themes/ directory and return all discovered theme manifests.
  * Each subdirectory with a manifest.json is treated as a theme.
+ *
+ * 主题文件夹只在进程启动（bootstrap 同步）与后台新建/删除主题时变化，
+ * 故扫描结果做进程级缓存；每次公开请求都 readdir+readFile 6 个清单是
+ * 纯粹的热路径浪费。写路径（createTheme/deleteTheme）负责调
+ * invalidateThemeDiscovery() 让缓存失效。
  */
+let discoveryCache: ThemeManifest[] | null = null;
+
 export function discoverThemes(): ThemeManifest[] {
+  if (discoveryCache) return discoveryCache;
+
   const themes: ThemeManifest[] = [];
 
-  if (!fs.existsSync(THEMES_DIR)) return themes;
+  if (fs.existsSync(THEMES_DIR)) {
+    const entries = fs.readdirSync(THEMES_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
 
-  const entries = fs.readdirSync(THEMES_DIR, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
+      const manifestPath = path.join(THEMES_DIR, entry.name, "manifest.json");
+      if (!fs.existsSync(manifestPath)) continue;
 
-    const manifestPath = path.join(THEMES_DIR, entry.name, "manifest.json");
-    if (!fs.existsSync(manifestPath)) continue;
-
-    try {
-      const raw = fs.readFileSync(manifestPath, "utf-8");
-      const manifest = JSON.parse(raw) as ThemeManifest;
-      // Trust the folder name over a mistyped slug so routing never breaks.
-      manifest.slug = manifest.slug || entry.name;
-      themes.push(manifest);
-    } catch {
-      // Skip invalid manifests
+      try {
+        const raw = fs.readFileSync(manifestPath, "utf-8");
+        const manifest = JSON.parse(raw) as ThemeManifest;
+        // Trust the folder name over a mistyped slug so routing never breaks.
+        manifest.slug = manifest.slug || entry.name;
+        themes.push(manifest);
+      } catch {
+        // Skip invalid manifests
+      }
     }
   }
 
+  discoveryCache = themes;
   return themes;
+}
+
+/** Drop the memoized manifest scan (after admin-side folder changes). */
+export function invalidateThemeDiscovery(): void {
+  discoveryCache = null;
 }
 
 /**

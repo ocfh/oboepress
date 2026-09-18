@@ -92,6 +92,13 @@
       "when": 1790020000000,
       "tag": "0012_post_pinyin_slugs",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1790100000000,
+      "tag": "0013_member_registration",
+      "breakpoints": true
     }
   ]
 }

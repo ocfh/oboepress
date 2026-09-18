@@ -17,7 +17,9 @@ import Breadcrumb from "@/components/shared/Breadcrumb";
 import PostToc from "@/components/shared/PostToc";
 import ShareButtons from "@/components/shared/ShareButtons";
 import RelatedPosts from "@/components/shared/RelatedPosts";
-import Comments from "@/components/shared/Comments";
+// 评论仅文章页渲染：经客户端懒边界 CommentsLazy 切成独立 chunk，
+// 首页/列表页不下载（RSC 直接 dynamic 保留 SSR 会被合入路由共享块）。
+import Comments from "@/components/shared/CommentsLazy";
 import WidgetArea from "@/components/shared/WidgetArea";
 
 /**

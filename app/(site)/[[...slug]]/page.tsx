@@ -1,7 +1,12 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
+import { getAdminSecurity } from "@/lib/services/security";
+import { getPublicRegisterConfig } from "@/lib/services/members";
+import AdminLogin from "@/components/admin/AdminLogin";
+import RegisterForm, { type RegisterConfig } from "@/components/site/RegisterForm";
 import {
   resolveSitePath,
   getPermalinkConfig,
@@ -97,23 +102,84 @@ function seoTargetFor(res: SitePathResolution, cfg: PermalinkConfig): SeoTarget 
   }
 }
 
+/** catch-all 未命中任何实体时，检查该路径是否为伪装的后台登录入口。 */
+async function resolveSecretEntry(slug: string[]): Promise<boolean> {
+  const sec = await getAdminSecurity();
+  if (!sec.entryEnabled) return false;
+  const tail = "/" + slug.join("/");
+  return tail === sec.entryPath;
+}
+
+/** 同上，检查是否为开启状态下的会员注册路径；关闭或不匹配返回 null。 */
+async function resolveRegisterPage(slug: string[]): Promise<RegisterConfig | null> {
+  const cfg = await getPublicRegisterConfig();
+  if (!cfg.enabled || cfg.path !== "/" + slug.join("/")) return null;
+  return cfg;
+}
+
 export async function generateMetadata({ params }: RouteProps): Promise<Metadata> {
+  const segments = params.slug ?? [];
   const [res, settings, cfg] = await Promise.all([
-    resolveSitePath(params.slug ?? []),
+    resolveSitePath(segments),
     getSettings(),
     getPermalinkConfig(),
   ]);
-  if (!res) return {};
+  if (!res) {
+    if (await resolveSecretEntry(segments)) {
+      // 登录入口不进任何索引。
+      return { title: "登录", robots: { index: false, follow: false } };
+    }
+    if (await resolveRegisterPage(segments)) {
+      return { title: "注册", robots: { index: false, follow: false } };
+    }
+    return {};
+  }
   return buildEntityMetadata(seoTargetFor(res, cfg), settings);
 }
 
 export default async function SiteCatchAll({ params, searchParams }: RouteProps) {
+  const segments = params.slug ?? [];
   const [res, settings, cfg] = await Promise.all([
-    resolveSitePath(params.slug ?? []),
+    resolveSitePath(segments),
     getSettings(),
     getPermalinkConfig(),
   ]);
-  if (!res) notFound();
+
+  // 未命中实体：可能是伪装后的后台登录入口，或开启中的会员注册页。
+  // 已登录用户误入登录入口直接进后台；注册页沿用公开主题外壳，已登录
+  // 用户（含会员）访问则回首页，避免重复注册。其余路径照旧 404。
+  if (!res) {
+    const [isEntry, registerCfg] = await Promise.all([
+      resolveSecretEntry(segments),
+      resolveRegisterPage(segments),
+    ]);
+    if (isEntry) {
+      const user = await getSession();
+      if (user) redirect("/admin");
+      return <AdminLogin />;
+    }
+    if (registerCfg) {
+      const user = await getSession();
+      if (user) redirect("/");
+      return (
+        <div className="flex justify-center py-12">
+          <div
+            className="w-full max-w-md rounded-2xl border bg-white/85 p-8 shadow-sm backdrop-blur"
+            style={{ borderColor: "var(--border-color)" }}
+          >
+            <h1
+              className="mb-6 text-center text-2xl font-bold"
+              style={{ color: "var(--text-color)" }}
+            >
+              注册账号
+            </h1>
+            <RegisterForm config={registerCfg} />
+          </div>
+        </div>
+      );
+    }
+    notFound();
+  }
 
   const theme = await getActiveTheme();
   const themeModule = (await loadThemeModule(theme.slug)) ?? (await loadThemeModule("default"));

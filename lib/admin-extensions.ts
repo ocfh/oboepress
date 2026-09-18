@@ -11,6 +11,7 @@ import {
   Boxes,
   LayoutGrid,
   Pin,
+  Link2,
 } from "lucide-react";
 
 /** Serializable description added to the admin sidebar via the `admin.menu` hook.
@@ -48,4 +49,5 @@ export const ADMIN_ICONS: Record<string, LucideIcon> = {
   boxes: Boxes,
   layoutgrid: LayoutGrid,
   pin: Pin,
+  link: Link2,
 };

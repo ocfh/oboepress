@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, ensureMigrations } from "@/db";
 import { users } from "@/db/schema";
 import type { Role } from "@/db/schema";
@@ -19,10 +19,16 @@ const DEV_SECRET_PATH = path.resolve(process.cwd(), ".data", ".auth-secret");
 
 export type SessionUser = {
   id: number;
-  email: string;
+  /** Null for members who registered without an email address. */
+  email: string | null;
   name: string;
   role: Role;
 };
+
+/** 会话同款签名密钥，供短生命周期令牌（如图形验证码）复用。 */
+export function getServerSecret(): Uint8Array {
+  return getSecret();
+}
 
 function getSecret(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
@@ -89,16 +95,25 @@ export async function setSessionCookie(user: SessionUser): Promise<void> {
   cookies().set(COOKIE_NAME, token, cookieOptions());
 }
 
-/** Validate email + password, returning a session user or null. */
+/**
+ * Validate credentials, returning a session user or null. The identifier may
+ * be an email (contains "@") or a unique nickname used by self-registered
+ * members; both lookups are case-insensitive.
+ */
 export async function verifyCredentials(
-  email: string,
+  account: string,
   password: string,
 ): Promise<SessionUser | null> {
   await ensureMigrations();
+  const identifier = account.trim();
   const [row] = await db
     .select()
     .from(users)
-    .where(eq(users.email, email));
+    .where(
+      identifier.includes("@")
+        ? sql`lower(${users.email}) = lower(${identifier})`
+        : sql`lower(${users.name}) = lower(${identifier})`,
+    );
   if (!row) return null;
   const ok = await verifyPassword(password, row.passwordHash);
   // Banned accounts fail like any other invalid credential.

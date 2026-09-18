@@ -190,4 +190,12 @@ export const HOOKS = {
    * excludes them from later pages so they can never appear twice.
    */
   postsPinned: "posts.pinned",
+  /**
+   * async filter — ({ entries, base, posts, pages, categories, tags })
+   * add, remove or rewrite sitemap rows right before /sitemap.xml renders.
+   * Entries may carry absolute `images` URLs (image sitemap extension).
+   */
+  sitemapUrls: "sitemap.urls",
+  /** filter — ({ lines, base }) mutate the generated /robots.txt lines */
+  robotsRules: "robots.rules",
 } as const;

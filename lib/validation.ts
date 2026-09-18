@@ -138,8 +138,33 @@ export const userInputSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email(),
+  // 邮箱或昵称：含 @ 按邮箱查，否则按昵称查（大小写不敏感）。
+  account: z.string().trim().min(1).max(200),
   password: z.string().min(1),
+  // 图形验证码答案或自定义验证码凭证；是否校验由服务端安全配置决定。
+  captcha: z.string().trim().max(200).optional(),
+});
+
+/**
+ * 前台自助注册。字段是否必填由服务端 memberSettings 二次决定（邮箱/手机号
+ * 均可选），这里只做与配置无关的通用边界校验。手机号仅去空白，格式由
+ * registerMember 统一校验（中国大陆 11 位或 E.164）。
+ */
+export const registerSchema = z.object({
+  name: z.string().trim().min(2).max(32),
+  email: z.string().trim().max(120).optional(),
+  phone: z.string().trim().max(20).optional(),
+  password: z.string().min(8).max(200),
+  captcha: z.string().trim().max(200).optional(),
+  // 邮箱 / 手机验证码（6 位），是否必需由服务端通知设置决定。
+  emailCode: z.string().trim().max(8).optional(),
+  phoneCode: z.string().trim().max(8).optional(),
+});
+
+/** 公开获取邮箱/短信验证码。 */
+export const sendCodeSchema = z.object({
+  channel: z.enum(["email", "sms"]),
+  target: z.string().trim().min(3).max(160),
 });
 
 /** A logged-in user changing their own password (requires current password). */

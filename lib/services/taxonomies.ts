@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, tags } from "@/db/schema";
@@ -16,7 +17,9 @@ export type TagWithUrl = Tag & { url: string };
 
 // ---------- Categories ----------
 
-export async function listCategories(): Promise<CategoryWithUrl[]> {
+/** 请求级去重：首页的分类区块与 CatNav 各拉一次全量分类，合并为一条查询。
+ *  分类写接口直接返回被保存的行，不存在请求内读后写依赖。 */
+export const listCategories = cache(async (): Promise<CategoryWithUrl[]> => {
   const [rows, cfg] = await Promise.all([
     db
       .select()
@@ -25,7 +28,7 @@ export async function listCategories(): Promise<CategoryWithUrl[]> {
     getPermalinkConfig(),
   ]);
   return rows.map((c) => ({ ...c, url: categoryUrlFor(cfg, c) }));
-}
+});
 
 export async function getCategory(id: number): Promise<Category> {
   const [row] = await db.select().from(categories).where(eq(categories.id, id));
@@ -128,13 +131,14 @@ export async function reorderCategories(
 
 // ---------- Tags ----------
 
-export async function listTags(): Promise<TagWithUrl[]> {
+/** 请求级去重：侧栏标签云等组件同请求内共享一次查询。 */
+export const listTags = cache(async (): Promise<TagWithUrl[]> => {
   const [rows, cfg] = await Promise.all([
     db.select().from(tags).orderBy(desc(tags.id)),
     getPermalinkConfig(),
   ]);
   return rows.map((t) => ({ ...t, url: tagUrlFor(cfg, t) }));
-}
+});
 
 export async function getTag(id: number): Promise<Tag> {
   const [row] = await db.select().from(tags).where(eq(tags.id, id));

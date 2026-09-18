@@ -23,7 +23,12 @@ export function uniqueSlug(base: string, taken: Set<string>): string {
 }
 
 export function excerptFrom(text: string, max = 160): string {
-  const clean = text.replace(/\s+/g, " ").trim();
+  // 摘要用于 SEO 描述与列表预览，必须剔除短代码标记（含成对短代码内部文本），
+  // 否则 [friendlinks] 之类会原样泄漏到 meta description。
+  const withoutShortcodes = text
+    .replace(/\[(\w+)[^\]]*\][\s\S]*?\[\/\1\]/g, " ")
+    .replace(/\[\w+[^\]]*\]/g, " ");
+  const clean = withoutShortcodes.replace(/\s+/g, " ").trim();
   return clean.length > max ? clean.slice(0, max).trimEnd() + "…" : clean;
 }
 

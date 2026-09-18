@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { desc, eq } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,6 +12,7 @@ import {
   getThemeManifest,
   getThemeSettingsSchema,
   getThemeWidgetAreas,
+  invalidateThemeDiscovery,
   type ThemeWidgetArea,
 } from "@/themes/registry";
 import { ensureBootstrap } from "./bootstrap";
@@ -65,6 +67,8 @@ export async function syncThemes(): Promise<void> {
 
 export async function listThemes(): Promise<Theme[]> {
   await ensureBootstrap();
+  // 后台列表是低频路径：重新扫盘以保留「手动删文件夹即时消失」的语义。
+  invalidateThemeDiscovery();
   await syncThemes();
   return db.select().from(themes).orderBy(desc(themes.isDefault), desc(themes.createdAt));
 }
@@ -75,9 +79,15 @@ export async function getThemeBySlug(slug: string): Promise<Theme | null> {
   return row ?? null;
 }
 
-export async function getActiveTheme(): Promise<Theme> {
+/**
+ * 公开渲染热路径上被调用最频繁的读取（root layout、catch-all、各主题
+ * Layout/HomePage/Sidebar 每请求 3~6 次）。React cache 让同一次请求内的
+ * 重复调用复用同一个 Promise；syncThemes 只在进程 bootstrap 与后台主题
+ * 管理动作（list/create/delete）时跑，绝不在每个公开请求里对每个主题
+ * 执行 upsert——那曾是单次首页渲染几十条无谓 SQL 的主要来源。
+ */
+export const getActiveTheme = cache(async (): Promise<Theme> => {
   await ensureBootstrap();
-  await syncThemes();
   const [settings] = await db
     .select()
     .from(siteSettings)
@@ -102,7 +112,7 @@ export async function getActiveTheme(): Promise<Theme> {
   const [anyTheme] = await db.select().from(themes).limit(1);
   if (anyTheme) return anyTheme;
   throw new NotFoundError("没有可用主题");
-}
+});
 
 export async function getThemeById(id: number): Promise<Theme> {
   const [row] = await db.select().from(themes).where(eq(themes.id, id));
@@ -126,6 +136,8 @@ export async function createTheme(input: ThemeInput): Promise<Theme> {
   const tpl = path.join(process.cwd(), "themes", "default");
   copyThemeTemplate(tpl, dir, slug, input.name, input.config);
 
+  // 新文件夹落盘后先让清单缓存失效，再同步入库。
+  invalidateThemeDiscovery();
   await syncThemes();
   const [row] = await db.select().from(themes).where(eq(themes.slug, slug));
   return row!;
@@ -239,6 +251,8 @@ export async function deleteTheme(id: number): Promise<{ id: number }> {
   if (fs.existsSync(dir)) {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+  // 文件夹已删：丢弃清单缓存，后续扫描不再找回该主题。
+  invalidateThemeDiscovery();
   await db.delete(themes).where(eq(themes.id, id));
   return { id };
 }
@@ -377,11 +391,13 @@ export async function resetThemePanel(idOrSlug: string | number): Promise<Theme>
 /**
  * Read the active theme's own settings — the accessor themes use at render
  * time, e.g. `const s = await getActiveThemeSettings(); s.heroTitle`.
+ * 请求级去重：bluemix 的 Layout/HomePage/CatNav/Sidebar 每请求各调一次，
+ * 底层的 schema 解析无需重复跑。
  */
-export async function getActiveThemeSettings(): Promise<Record<string, unknown>> {
+export const getActiveThemeSettings = cache(async (): Promise<Record<string, unknown>> => {
   const theme = await getActiveTheme();
   return resolveSettings(getThemeSettingsSchema(theme.slug), theme.settings);
-}
+});
 
 /** A specific (non-active) theme's resolved settings — used by the shared engine. */
 export async function getThemeSettings(slug: string): Promise<Record<string, unknown>> {

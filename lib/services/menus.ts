@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { menus, menuItems, type MenuItem } from "@/db/schema";
@@ -60,7 +61,9 @@ function buildTree(flat: MenuItem[]): MenuNode[] {
   return roots;
 }
 
-export async function getMenuByLocation(location: string): Promise<MenuWithItems | null> {
+/** 请求级去重（按 location）：主题 Layout 与各导航组件同请求内共享。
+ *  菜单写接口回读走 getMenu(id)，不经过这里，无读后写陈旧问题。 */
+export const getMenuByLocation = cache(async (location: string): Promise<MenuWithItems | null> => {
   const [menu] = await db.select().from(menus).where(eq(menus.location, location));
   if (!menu) return null;
   const flat = await db
@@ -69,7 +72,7 @@ export async function getMenuByLocation(location: string): Promise<MenuWithItems
     .where(eq(menuItems.menuId, menu.id))
     .orderBy(asc(menuItems.order), asc(menuItems.id));
   return { id: menu.id, location: menu.location, name: menu.name, items: buildTree(flat) };
-}
+});
 
 export async function listMenus(): Promise<MenuWithItems[]> {
   const all = await db.select().from(menus).orderBy(asc(menus.id));

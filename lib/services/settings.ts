@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -82,11 +83,17 @@ export type SiteSettingsInput = {
   language?: string;
 };
 
-export async function getSettings(): Promise<SiteSettings> {
+/**
+ * 全站设置单行在一次公开渲染中会被 root layout、catch-all、主题 Layout、
+ * Sidebar 等读取 4~6 次；React cache 把同请求内的重复查询合并为一条 SQL。
+ * 写接口 updateSettings 直接返回更新后的行，不依赖读后写，故请求内缓存
+ * 不会让后台保存响应拿到旧值。
+ */
+export const getSettings = cache(async (): Promise<SiteSettings> => {
   await ensureBootstrap();
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
   return row!;
-}
+});
 
 /**
  * Patch the singleton settings row.

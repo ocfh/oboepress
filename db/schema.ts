@@ -49,7 +49,10 @@ export const users = pgTable(
   "users",
   {
     id: serial("id").primaryKey(),
-    email: text("email").notNull().unique(),
+    // Email is nullable: front-end self-registration may omit it (members log
+    // in with their unique nickname). Postgres unique indexes treat NULLs as
+    // distinct, so many email-less accounts coexist.
+    email: text("email").unique(),
     name: text("name").notNull(),
     passwordHash: text("password_hash").notNull(),
     role: roleEnum("role").notNull().default("author"),
@@ -65,7 +68,11 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => ({ phoneIdx: uniqueIndex("users_phone_idx").on(t.phone) }),
+  (t) => ({
+    phoneIdx: uniqueIndex("users_phone_idx").on(t.phone),
+    // Nicknames double as login identifiers for self-registered members.
+    nameIdx: uniqueIndex("users_name_idx").on(t.name),
+  }),
 );
 
 /**

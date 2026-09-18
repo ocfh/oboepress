@@ -1,10 +1,21 @@
 ﻿"use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import dynamic from "next/dynamic";
 import { Smile, User, Mail, Link as LinkIcon, RotateCcw, Reply, Send } from "lucide-react";
 import type { CommentConfig } from "@/lib/comments-config";
-import ThirdPartyComments from "@/components/shared/comments/CommentProviders";
-import EmojiPanel from "@/components/shared/comments/EmojiPanel";
+
+// 按需分包（client-only）：表情面板仅在点开表情按钮时才下载；
+// 第三方评论（6 个 provider 的脚本注入器）仅在后台启用非 builtin
+// 通道时才下载。内置评论页不承担这两块体积。
+const ThirdPartyComments = dynamic(
+  () => import("@/components/shared/comments/CommentProviders"),
+  { ssr: false },
+);
+const EmojiPanel = dynamic(
+  () => import("@/components/shared/comments/EmojiPanel"),
+  { ssr: false },
+);
 
 type C = {
   id: number;

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getOption, setOption } from "./options";
 import { pinyinSlug } from "@/lib/pinyin";
 import type { PostListItem } from "./posts";
@@ -75,10 +76,12 @@ export function normalizePermalinkConfig(input: Partial<PermalinkConfig>): Perma
   return cfg;
 }
 
-export async function getPermalinkConfig(): Promise<PermalinkConfig> {
+/** 请求级去重：一次公开渲染中 URL 生成器（Layout/CatNav/卡片/分类列表）
+ *  会读取配置 5+ 次；规范化结果在请求内不变，合并为一次 KV 读取。 */
+export const getPermalinkConfig = cache(async (): Promise<PermalinkConfig> => {
   const stored = (await getOption<Partial<PermalinkConfig>>(OPTION_KEY, {})) ?? {};
   return normalizePermalinkConfig({ ...DEFAULT_PERMALINKS, ...stored });
-}
+});
 
 export async function savePermalinkConfig(input: Partial<PermalinkConfig>): Promise<PermalinkConfig> {
   const cfg = normalizePermalinkConfig(input);
