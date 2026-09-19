@@ -17,6 +17,7 @@ export type FieldType =
   | "links" // repeatable {label,url} list
   | "footerLinks" // repeatable {text,url,image?} list — footer links
   | "categoryRows" // repeatable {slug,title} list — homepage category sections
+  | "verifications" // webmaster verification codes {google,yandex,bing,yahoo}
   | "hidden" // stored but never rendered — plugin custom panels own the UI
   | "group"; // visual sub-heading, no value
 
@@ -119,6 +120,16 @@ export function coerceField(field: SettingField, raw: unknown): unknown {
               title: String(r.title ?? ""),
             }))
         : [];
+    case "verifications": {
+      // 站长验证码固定 4 家；保留非空、裁剪首尾空白，未知键丢弃。
+      const src = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+      const out: Record<string, string> = {};
+      for (const k of ["google", "yandex", "bing", "yahoo"]) {
+        const v = typeof src[k] === "string" ? (src[k] as string).trim() : "";
+        if (v) out[k] = v;
+      }
+      return out;
+    }
     default:
       return typeof raw === "string" ? raw : raw == null ? "" : String(raw);
   }

@@ -1,5 +1,6 @@
 import { KeyRound, UserRound, Share2 } from "lucide-react";
 import { getSession } from "@/lib/auth";
+import { getOwnProfile } from "@/lib/services/users";
 import AccountPasswordForm from "@/components/AccountPasswordForm";
 import AccountProfileForm from "@/components/AccountProfileForm";
 import OAuthBindings from "@/components/account/OAuthBindings";
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const user = await getSession();
+  const profile = user ? await getOwnProfile(user) : null;
   return (
     <div>
       <div className="flex items-center gap-2">
@@ -22,8 +24,9 @@ export default async function AccountPage() {
           </div>
           <div className="px-5 py-5">
             <AccountProfileForm
-              initialName={user?.name ?? ""}
-              initialEmail={user?.email ?? ""}
+              initialName={profile?.name ?? ""}
+              initialEmail={profile?.email ?? ""}
+              initialPhone={profile?.phone ?? ""}
             />
             <p className="mt-4 border-t border-zinc-800 pt-4 text-sm text-zinc-400">
               角色

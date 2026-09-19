@@ -8,6 +8,8 @@ export const dynamic = "force-dynamic";
 const memberSchema = z.object({
   registerEnabled: z.boolean().optional(),
   registerPath: z.string().optional(),
+  nameRequired: z.boolean().optional(),
+  passwordRequired: z.boolean().optional(),
   emailRequired: z.boolean().optional(),
   phoneRequired: z.boolean().optional(),
   captchaEnabled: z.boolean().optional(),

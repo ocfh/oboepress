@@ -16,6 +16,8 @@ type DefaultRole = "subscriber" | "author";
 type MemberCfg = {
   registerEnabled: boolean;
   registerPath: string;
+  nameRequired: boolean;
+  passwordRequired: boolean;
   emailRequired: boolean;
   phoneRequired: boolean;
   captchaEnabled: boolean;
@@ -184,6 +186,38 @@ export default function MembersAdmin() {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-100">昵称必填</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              开启后注册必须填写昵称；关闭后留空将由系统自动生成唯一昵称，
+              会员可在个人资料中修改。
+            </p>
+          </div>
+          <Toggle
+            checked={cfg.nameRequired}
+            onChange={(v) => setCfg({ ...cfg, nameRequired: v })}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-100">密码必填</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              开启后注册必须设置密码；关闭后允许免密注册（可用验证码或第三方登录），
+              会员事后可在账号中心补设密码。
+            </p>
+          </div>
+          <Toggle
+            checked={cfg.passwordRequired}
+            onChange={(v) => setCfg({ ...cfg, passwordRequired: v })}
+          />
+        </div>
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">

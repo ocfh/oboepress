@@ -224,7 +224,7 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
    low-specificity on purpose: bluemix / codeman / pseudolinear ship their own
    higher-specificity overrides; this block only guarantees a usable,
    reference-style (bordered .input box, icon guest row, right-aligned submit)
-   form in themes without form CSS — default / skyscraper / oboepress-2032 —
+   form in themes without form CSS — default / skyscraper —
    using the generic theme tokens (--surface, --border, --accent, …).
    =========================================================================== */
 .comment-form{ display:block; margin:20px 0; }

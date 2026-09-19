@@ -18,11 +18,36 @@ import {
  */
 
 type Webhook = { url: string; method: "POST" | "GET" | "PUT"; headers: string; body: string };
+type AliyunSms = {
+  accessKeyId: string;
+  accessKeySecret: string;
+  signName: string;
+  templateCode: string;
+  codeParam: string;
+  endpoint: string;
+};
+type TencentSms = {
+  secretId: string;
+  secretKey: string;
+  sdkAppId: string;
+  signName: string;
+  templateId: string;
+  region: string;
+  endpoint: string;
+};
 type NotifyCfg = {
   smtp: { host: string; port: number; security: "TLS" | "STARTTLS" | "NONE"; user: string; pass: string; from: string };
   email: { enabled: boolean; via: "smtp" | "webhook"; webhook: Webhook };
-  sms: { enabled: boolean; signature: string; webhook: Webhook };
+  sms: {
+    enabled: boolean;
+    provider: "webhook" | "aliyun" | "tencent";
+    signature: string;
+    webhook: Webhook;
+    aliyun: AliyunSms;
+    tencent: TencentSms;
+  };
   register: { emailVerify: boolean; phoneVerify: boolean };
+  login: { emailVerify: boolean; phoneVerify: boolean };
 };
 
 const inputCls =
@@ -134,12 +159,23 @@ export default function NotifyAdmin() {
       .catch(() => setLoadError(true));
   }, []);
 
-  /** 组装下发体：密码留空时剔除 pass 键（保留原密码）；填写了才覆盖。 */
+  /** 组装下发体：密码 / 短信密钥留空时剔除该键（保留原值），填写了才覆盖。 */
   function buildPayload(): NotifyCfg {
     const smtp: NotifyCfg["smtp"] = { ...cfg!.smtp };
     if (passDraft) smtp.pass = passDraft;
     else delete (smtp as Partial<NotifyCfg["smtp"]>).pass;
-    return { ...cfg!, smtp };
+    const sms: NotifyCfg["sms"] = {
+      ...cfg!.sms,
+      aliyun: { ...cfg!.sms.aliyun },
+      tencent: { ...cfg!.sms.tencent },
+    };
+    if (!sms.aliyun.accessKeySecret) {
+      delete (sms.aliyun as Partial<AliyunSms>).accessKeySecret;
+    }
+    if (!sms.tencent.secretKey) {
+      delete (sms.tencent as Partial<TencentSms>).secretKey;
+    }
+    return { ...cfg!, smtp, sms };
   }
 
   async function save(): Promise<boolean> {
@@ -320,19 +356,152 @@ export default function NotifyAdmin() {
       {/* 短信通道 */}
       <Card
         title="短信验证码通道"
-        desc="各家短信网关通过自定义 HTTP Webhook 对接，URL / 请求头 / 请求体均支持占位符。"
+        desc="内置阿里云、腾讯云短信签名调用（零依赖），也可通过任意自定义 HTTP 网关对接。密钥保存后留空表示不修改。"
         enabled={cfg.sms.enabled}
         onToggle={(v) => setCfg({ ...cfg, sms: { ...cfg.sms, enabled: v } })}
       >
-        <div>
-          <label className={labelCls}>短信签名（用于 {"{{sign}}"}，如 OboePress）</label>
-          <input className={inputCls} value={cfg.sms.signature}
-            onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, signature: e.target.value } })} />
+        <div className="grid grid-cols-3 gap-2">
+          {([
+            ["aliyun", "阿里云短信"],
+            ["tencent", "腾讯云短信"],
+            ["webhook", "自定义接口"],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setCfg({ ...cfg, sms: { ...cfg.sms, provider: key } })}
+              className={`rounded-md border px-3 py-2 text-xs transition ${
+                cfg.sms.provider === key
+                  ? "border-indigo-500 bg-indigo-950/40 text-zinc-100"
+                  : "border-zinc-700 text-zinc-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <WebhookFields
-          value={cfg.sms.webhook}
-          onChange={(w) => setCfg({ ...cfg, sms: { ...cfg.sms, webhook: w } })}
-        />
+
+        {cfg.sms.provider === "webhook" && (
+          <>
+            <div>
+              <label className={labelCls}>短信签名（用于 {"{{sign}}"}，如 OboePress）</label>
+              <input className={inputCls} value={cfg.sms.signature}
+                onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, signature: e.target.value } })} />
+            </div>
+            <WebhookFields
+              value={cfg.sms.webhook}
+              onChange={(w) => setCfg({ ...cfg, sms: { ...cfg.sms, webhook: w } })}
+            />
+          </>
+        )}
+
+        {cfg.sms.provider === "aliyun" && (
+          <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>AccessKey ID</label>
+                <input className={inputCls} spellCheck={false} autoComplete="off"
+                  value={cfg.sms.aliyun.accessKeyId}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, accessKeyId: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>AccessKey Secret</label>
+                <input type="password" className={inputCls} autoComplete="new-password"
+                  placeholder={cfg.sms.aliyun.accessKeyId ? "••••••（留空保持不变）" : "未设置"}
+                  value={cfg.sms.aliyun.accessKeySecret}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, accessKeySecret: e.target.value } } })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>短信签名名称（不带【】）</label>
+                <input className={inputCls} placeholder="OboePress"
+                  value={cfg.sms.aliyun.signName}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, signName: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>模板 CODE</label>
+                <input className={inputCls} spellCheck={false} placeholder="SMS_123456789"
+                  value={cfg.sms.aliyun.templateCode}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, templateCode: e.target.value } } })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>验证码模板变量名（默认 code）</label>
+                <input className={inputCls} spellCheck={false} placeholder="code"
+                  value={cfg.sms.aliyun.codeParam}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, codeParam: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>接入点（高级，留空默认国内站）</label>
+                <input className={inputCls} spellCheck={false} placeholder="https://dysmsapi.aliyuncs.com"
+                  value={cfg.sms.aliyun.endpoint}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, aliyun: { ...cfg.sms.aliyun, endpoint: e.target.value } } })} />
+              </div>
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              {"模板内容需含一个验证码变量，如「您的验证码为 ${code}，10 分钟内有效」；变量名与上方填写一致。"}
+            </p>
+          </div>
+        )}
+
+        {cfg.sms.provider === "tencent" && (
+          <div className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950/40 p-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>SecretId</label>
+                <input className={inputCls} spellCheck={false} autoComplete="off"
+                  value={cfg.sms.tencent.secretId}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, secretId: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>SecretKey</label>
+                <input type="password" className={inputCls} autoComplete="new-password"
+                  placeholder={cfg.sms.tencent.secretId ? "••••••（留空保持不变）" : "未设置"}
+                  value={cfg.sms.tencent.secretKey}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, secretKey: e.target.value } } })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>SdkAppId（短信应用 ID）</label>
+                <input className={inputCls} spellCheck={false} placeholder="1400000000"
+                  value={cfg.sms.tencent.sdkAppId}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, sdkAppId: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>模板 ID（纯数字）</label>
+                <input className={inputCls} spellCheck={false} placeholder="1234567"
+                  value={cfg.sms.tencent.templateId}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, templateId: e.target.value } } })} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelCls}>短信签名内容</label>
+                <input className={inputCls} placeholder="OboePress"
+                  value={cfg.sms.tencent.signName}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, signName: e.target.value } } })} />
+              </div>
+              <div>
+                <label className={labelCls}>地域（默认 ap-guangzhou）</label>
+                <input className={inputCls} spellCheck={false} placeholder="ap-guangzhou"
+                  value={cfg.sms.tencent.region}
+                  onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, region: e.target.value } } })} />
+              </div>
+            </div>
+            <div>
+              <label className={labelCls}>接入点（高级，留空按地域推导）</label>
+              <input className={inputCls} spellCheck={false} placeholder="https://sms.ap-guangzhou.tencentcloudapi.com"
+                value={cfg.sms.tencent.endpoint}
+                onChange={(e) => setCfg({ ...cfg, sms: { ...cfg.sms, tencent: { ...cfg.sms.tencent, endpoint: e.target.value } } })} />
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              大陆手机号自动补 +86，其他地区请在测试/注册时携带国家码；验证码模板只允许一个变量。
+            </p>
+          </div>
+        )}
       </Card>
 
       {/* 注册校验开关 */}
@@ -360,6 +529,28 @@ export default function NotifyAdmin() {
           <Link href="/admin/members" className="text-indigo-400 hover:underline"> 会员注册 </Link>
           页的「邮箱必填 / 手机号必填」控制；选填字段填写了才会校验对应验证码。
         </p>
+      </Card>
+
+      {/* 登录验证码开关 */}
+      <Card title="登录验证码策略" desc="开启后，登录页允许使用邮箱/手机验证码免密登录；通道未开启时对应方式不显示。">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-zinc-300">
+            <Mail size={14} className="text-zinc-500" /> 允许邮箱验证码登录
+          </div>
+          <Toggle
+            checked={cfg.login.emailVerify}
+            onChange={(v) => setCfg({ ...cfg, login: { ...cfg.login, emailVerify: v } })}
+          />
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
+          <div className="flex items-center gap-2 text-xs text-zinc-300">
+            <MessageSquare size={14} className="text-zinc-500" /> 允许手机验证码登录
+          </div>
+          <Toggle
+            checked={cfg.login.phoneVerify}
+            onChange={(v) => setCfg({ ...cfg, login: { ...cfg.login, phoneVerify: v } })}
+          />
+        </div>
       </Card>
 
       {/* 通道测试 */}

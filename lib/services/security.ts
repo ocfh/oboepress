@@ -13,6 +13,9 @@ import { ValidationError } from "./errors";
  */
 export type CaptchaMode = "builtin" | "custom";
 
+/** 自定义验证码校验接口允许的 HTTP 方法（GET 时请把 {{token}} 拼进地址）。 */
+export type CaptchaVerifyMethod = "POST" | "GET" | "PUT";
+
 export interface AdminSecurity {
   /** 开启伪装：未登录访问 /admin* 一律 404。 */
   entryEnabled: boolean;
@@ -22,8 +25,16 @@ export interface AdminSecurity {
   captchaEnabled: boolean;
   /** builtin=本地 SVG 图形验证码；custom=把凭证 POST 到自定义接口校验。 */
   captchaMode: CaptchaMode;
-  /** custom 模式的校验接口地址，返回 {ok:true} 视为通过。 */
+  /** custom 模式的校验接口地址，支持 {{token}} 模板，返回 {ok:true} 视为通过。 */
   captchaVerifyUrl: string;
+  /** 校验请求的 HTTP 方法。 */
+  captchaVerifyMethod: CaptchaVerifyMethod;
+  /** 校验请求头原文：JSON 对象或每行 `Key: Value`。 */
+  captchaVerifyHeaders: string;
+  /** 校验请求体模板，{{token}} 替换为用户输入；GET 方法不发送请求体。 */
+  captchaVerifyBody: string;
+  /** 成功判定规则，形如 `code=200`（左侧支持点路径）；留空沿用 2xx+ok/success。 */
+  captchaVerifySuccess: string;
   /** 登录失败限流：滑动窗口内连续失败达到阈值后临时拒绝登录。 */
   throttleEnabled: boolean;
   /** 窗口内允许的最大失败次数。 */
@@ -40,6 +51,11 @@ const DEFAULT_SECURITY: AdminSecurity = {
   captchaEnabled: false,
   captchaMode: "builtin",
   captchaVerifyUrl: "",
+  captchaVerifyMethod: "POST",
+  captchaVerifyHeaders: "",
+  // 零配置默认即旧行为：POST JSON {"token": 用户输入}。
+  captchaVerifyBody: '{"token":"{{token}}"}',
+  captchaVerifySuccess: "",
   throttleEnabled: true,
   throttleMaxFailures: 5,
   throttleWindowMinutes: 15,
@@ -121,6 +137,14 @@ function clampInt(raw: unknown, fallback: number, min: number, max: number): num
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
+/** 文本设置项的容错合并：非字符串保留现值，trim 后超长直接 422（配置错误要当场暴露）。 */
+function clampText(raw: unknown, fallback: string, max: number, label: string): string {
+  if (typeof raw !== "string") return fallback;
+  const s = raw.trim();
+  if (s.length > max) throw new ValidationError(`${label}过长（最多 ${max} 个字符）`);
+  return s;
+}
+
 /**
  * 规范化并校验入口路径：
  * 小写、去重斜杠/尾斜杠，仅允许字母数字 - _ /，1~3 段、总长 ≤ 64；
@@ -149,6 +173,30 @@ export async function saveAdminSecurity(
       typeof input.captchaVerifyUrl === "string"
         ? input.captchaVerifyUrl.trim()
         : current.captchaVerifyUrl,
+    captchaVerifyMethod:
+      input.captchaVerifyMethod === "POST" ||
+      input.captchaVerifyMethod === "GET" ||
+      input.captchaVerifyMethod === "PUT"
+        ? input.captchaVerifyMethod
+        : current.captchaVerifyMethod,
+    captchaVerifyHeaders: clampText(
+      input.captchaVerifyHeaders,
+      current.captchaVerifyHeaders,
+      2000,
+      "验证码请求头",
+    ),
+    captchaVerifyBody: clampText(
+      input.captchaVerifyBody,
+      current.captchaVerifyBody,
+      2000,
+      "验证码请求体模板",
+    ),
+    captchaVerifySuccess: clampText(
+      input.captchaVerifySuccess,
+      current.captchaVerifySuccess,
+      100,
+      "验证码成功判定规则",
+    ),
     throttleEnabled:
       typeof input.throttleEnabled === "boolean"
         ? input.throttleEnabled
@@ -166,8 +214,13 @@ export async function saveAdminSecurity(
       1440,
     ),
   };
-  // 内置模式不需要外部地址，清掉避免残留配置在切回 custom 时静默生效。
-  if (next.captchaMode === "builtin") next.captchaVerifyUrl = "";
+  // 内置模式不需要外部接口配置，清掉避免残留配置在切回 custom 时静默生效。
+  if (next.captchaMode === "builtin") {
+    next.captchaVerifyUrl = "";
+    next.captchaVerifyHeaders = "";
+    next.captchaVerifyBody = DEFAULT_SECURITY.captchaVerifyBody;
+    next.captchaVerifySuccess = "";
+  }
 
   next.entryPath = await normalizePublicPath(next.entryPath);
 
@@ -175,9 +228,14 @@ export async function saveAdminSecurity(
     if (!next.captchaVerifyUrl) {
       throw new ValidationError("请填写验证码校验接口地址");
     }
+    // 先渲染掉 {{token}} 再校验 URL 合法性（占位符在 query 中是合法字符）。
+    const renderedUrl = next.captchaVerifyUrl.replace(
+      /\{\{\s*token\s*\}\}/g,
+      "x",
+    );
     let u: URL;
     try {
-      u = new URL(next.captchaVerifyUrl);
+      u = new URL(renderedUrl);
     } catch {
       throw new ValidationError("验证码校验接口地址不是合法 URL");
     }
@@ -186,6 +244,21 @@ export async function saveAdminSecurity(
     }
     if (next.captchaVerifyUrl.length > 255) {
       throw new ValidationError("校验接口地址过长（最多 255 个字符）");
+    }
+    // 请求头若写成 JSON 对象，保存时就拦住语法错误，别等登录时才报错。
+    if (next.captchaVerifyHeaders.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(next.captchaVerifyHeaders) as unknown;
+        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+          throw new Error("not-object");
+        }
+      } catch {
+        throw new ValidationError("验证码请求头 JSON 格式不正确");
+      }
+    }
+    // 成功规则必须是 `字段路径=期望值`；点路径留给运行时取，这里只校形态。
+    if (next.captchaVerifySuccess && !next.captchaVerifySuccess.includes("=")) {
+      throw new ValidationError("成功判定规则格式应为 code=200 这样的 路径=值");
     }
   }
 

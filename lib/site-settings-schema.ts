@@ -205,6 +205,14 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
       },
       { key: "twitterSite", label: "Twitter @账号", type: "text", default: "", half: true },
       { key: "ogImageUrl", label: "默认分享图", type: "image", default: "" },
+      { key: "group_verify", label: "站长验证", type: "group" },
+      {
+        key: "verifications",
+        label: "搜索引擎站长验证码",
+        type: "verifications",
+        default: {},
+        help: "只填验证码内容（meta 标签 content 的值），保存后自动输出到全站 <head>。",
+      },
     ],
   },
   {

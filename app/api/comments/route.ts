@@ -1,9 +1,11 @@
-import { authenticate, authorize, handleError, ok, readJson } from "@/lib/http";
+import { authenticate, authorize, handleError, ok, fail, readJson } from "@/lib/http";
 import { getSession } from "@/lib/auth";
 import { listComments, createComment } from "@/lib/services/comments";
 import { getPostById } from "@/lib/services/posts";
 import { getPageById } from "@/lib/services/pages";
 import { commentInputSchema } from "@/lib/validation";
+import { ensurePluginsLoaded } from "@/lib/services/plugins";
+import { applyAsyncFilters, HOOKS } from "@/lib/hooks";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,8 +68,21 @@ export async function POST(req: Request) {
       req.headers.get("x-forwarded-host") ||
       req.headers.get("host") ||
       new URL(req.url).host;
+
+    // 人机验证等守卫插件挂载点：在任何写入之前拦截（comment-captcha 等）。
+    await ensurePluginsLoaded();
+    const gate = await applyAsyncFilters(HOOKS.commentSubmission, {
+      data: body.data,
+      userId: session?.id ?? null,
+      ip,
+      reject: undefined as string | undefined,
+    });
+    if (gate.reject) return fail(gate.reject, 422);
+
+    // 验证透传字段不进入评论存储服务。
+    const { captchaToken: _token, captchaAnswer: _answer, ...input } = body.data;
     const { comment, isPublic } = await createComment({
-      ...body.data,
+      ...input,
       userId: session?.id ?? null,
       ip,
       siteHost,

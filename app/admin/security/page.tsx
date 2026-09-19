@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 type CaptchaMode = "builtin" | "custom";
+type CaptchaVerifyMethod = "POST" | "GET" | "PUT";
 
 type SecurityCfg = {
   entryEnabled: boolean;
@@ -18,6 +19,10 @@ type SecurityCfg = {
   captchaEnabled: boolean;
   captchaMode: CaptchaMode;
   captchaVerifyUrl: string;
+  captchaVerifyMethod: CaptchaVerifyMethod;
+  captchaVerifyHeaders: string;
+  captchaVerifyBody: string;
+  captchaVerifySuccess: string;
   throttleEnabled: boolean;
   throttleMaxFailures: number;
   throttleWindowMinutes: number;
@@ -25,6 +30,8 @@ type SecurityCfg = {
 
 const inputCls =
   "w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-indigo-500";
+
+const codeCls = inputCls + " resize-y font-mono text-xs leading-5";
 
 export default function SecurityAdmin() {
   const [cfg, setCfg] = useState<SecurityCfg | null>(null);
@@ -211,24 +218,117 @@ export default function SecurityAdmin() {
             </div>
 
             {cfg.captchaMode === "custom" && (
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zinc-200">
-                  验证码校验接口地址
-                </label>
-                <input
-                  className={inputCls}
-                  value={cfg.captchaVerifyUrl}
-                  onChange={(e) => setCfg({ ...cfg, captchaVerifyUrl: e.target.value })}
-                  placeholder="https://example.com/api/verify-captcha"
-                  spellCheck={false}
-                />
-                <p className="mt-1 text-xs leading-5 text-zinc-500">
-                  登录时系统会以 POST 发送 <code className="text-zinc-300">{"{ token }"}</code>
-                  到该地址（8 秒超时），返回 HTTP 200 且响应体为
-                  <code className="text-zinc-300">{"{ ok: true }"}</code> 或
-                  <code className="text-zinc-300">{"{ success: true }"}</code>
-                  才视为通过；接口不可用时登录将被暂时拒绝。
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-zinc-200">
+                    请求方法
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["POST", "GET", "PUT"] as CaptchaVerifyMethod[]).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setCfg({ ...cfg, captchaVerifyMethod: m })}
+                        className={`rounded-md border px-2 py-1.5 font-mono text-xs transition ${
+                          cfg.captchaVerifyMethod === m
+                            ? "border-indigo-500 bg-indigo-950/40 text-indigo-200"
+                            : "border-zinc-700 text-zinc-400 hover:border-zinc-500"
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-200">
+                    验证码校验接口地址
+                  </label>
+                  <input
+                    className={inputCls + " font-mono text-xs"}
+                    value={cfg.captchaVerifyUrl}
+                    onChange={(e) => setCfg({ ...cfg, captchaVerifyUrl: e.target.value })}
+                    placeholder="https://example.com/api/verify-captcha?token={{token}}"
+                    spellCheck={false}
+                  />
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    支持 <code className="text-zinc-300">{"{{token}}"}</code> 占位符，
+                    在地址中会自动做 URL 编码；使用 GET 方法时请把占位符拼在 query 参数里。
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-200">
+                    请求头（可选）
+                  </label>
+                  <textarea
+                    className={codeCls}
+                    rows={3}
+                    value={cfg.captchaVerifyHeaders}
+                    onChange={(e) =>
+                      setCfg({ ...cfg, captchaVerifyHeaders: e.target.value })
+                    }
+                    placeholder={'{\n  "Authorization": "Bearer xxx"\n}'}
+                    spellCheck={false}
+                  />
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    可填 JSON 对象，或每行一个 <code className="text-zinc-300">Key: Value</code>；
+                    留空时 JSON 形请求体会自动带 <code className="text-zinc-300">Content-Type: application/json</code>。
+                  </p>
+                </div>
+
+                {cfg.captchaVerifyMethod === "GET" ? (
+                  <div className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs leading-5 text-zinc-500">
+                    GET 请求不发送请求体，请确认已把
+                    <code className="text-zinc-300">{"{{token}}"}</code>
+                    拼进上方接口地址。
+                  </div>
+                ) : (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-zinc-200">
+                      请求体模板
+                    </label>
+                    <textarea
+                      className={codeCls}
+                      rows={3}
+                      value={cfg.captchaVerifyBody}
+                      onChange={(e) =>
+                        setCfg({ ...cfg, captchaVerifyBody: e.target.value })
+                      }
+                      placeholder={'{"token":"{{token}}"}'}
+                      spellCheck={false}
+                    />
+                    <p className="mt-1 text-xs leading-5 text-zinc-500">
+                      <code className="text-zinc-300">{"{{token}}"}</code>
+                      会替换为用户输入的验证码；默认值即大多数接口使用的
+                      <code className="text-zinc-300">{"{ token }"}</code> JSON 报文。
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-zinc-200">
+                    成功判定规则（可选）
+                  </label>
+                  <input
+                    className={inputCls + " font-mono text-xs"}
+                    value={cfg.captchaVerifySuccess}
+                    onChange={(e) =>
+                      setCfg({ ...cfg, captchaVerifySuccess: e.target.value })
+                    }
+                    placeholder="code=200"
+                    spellCheck={false}
+                  />
+                  <p className="mt-1 text-xs leading-5 text-zinc-500">
+                    形如 <code className="text-zinc-300">code=200</code>，左侧为响应 JSON
+                    的字段路径（支持 <code className="text-zinc-300">data.code</code> 点路径），
+                    右侧为期望值（true/false/数字按类型匹配）；留空时默认 HTTP 2xx 且响应体
+                    <code className="text-zinc-300">{"{ ok: true }"}</code> 或
+                    <code className="text-zinc-300">{"{ success: true }"}</code> 才放行。
+                    接口 8 秒不可达时登录将被暂时拒绝。
+                  </p>
+                </div>
               </div>
             )}
           </div>

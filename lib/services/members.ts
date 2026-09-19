@@ -1,4 +1,5 @@
 import "server-only";
+import crypto from "node:crypto";
 import { cache } from "react";
 import { sql } from "drizzle-orm";
 import { db, ensureMigrations } from "@/db";
@@ -7,6 +8,7 @@ import type { Role } from "@/db/schema";
 import { hashPassword } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { getOption, setOption } from "./options";
+import { addPasswordlessMark } from "./passwordless-mark";
 import { getAdminSecurity, normalizePublicPath } from "./security";
 import { getNotifySettings } from "./notify";
 import { verifyCode } from "./verify-codes";
@@ -32,6 +34,10 @@ export interface MemberSettings {
   registerEnabled: boolean;
   /** 注册页路径，默认 /user，必须以单斜杠开头；不能出现 admin 段。 */
   registerPath: string;
+  /** 注册时昵称是否必填；关闭后留空由系统生成唯一昵称。 */
+  nameRequired: boolean;
+  /** 注册时密码是否必填；关闭后可免密注册（随机未知哈希 + nopassword 标记）。 */
+  passwordRequired: boolean;
   /** 注册时邮箱是否必填；关闭后邮箱字段为可选。 */
   emailRequired: boolean;
   /** 注册时手机号是否必填；关闭后手机号字段为可选（仍可填）。 */
@@ -49,6 +55,8 @@ export interface MemberSettings {
 const DEFAULT_SETTINGS: MemberSettings = {
   registerEnabled: false,
   registerPath: "/user",
+  nameRequired: true,
+  passwordRequired: true,
   emailRequired: true,
   phoneRequired: false,
   captchaEnabled: false,
@@ -78,6 +86,14 @@ export async function saveMemberSettings(
       typeof input.registerPath === "string"
         ? input.registerPath
         : current.registerPath,
+    nameRequired:
+      typeof input.nameRequired === "boolean"
+        ? input.nameRequired
+        : current.nameRequired,
+    passwordRequired:
+      typeof input.passwordRequired === "boolean"
+        ? input.passwordRequired
+        : current.passwordRequired,
     emailRequired:
       typeof input.emailRequired === "boolean"
         ? input.emailRequired
@@ -152,6 +168,8 @@ export const getPublicRegisterConfig = cache(async () => {
     return {
       enabled: false,
       path: null,
+      nameRequired: true,
+      passwordRequired: true,
       emailRequired: true,
       phoneRequired: false,
       emailVerify: false,
@@ -164,6 +182,8 @@ export const getPublicRegisterConfig = cache(async () => {
   return {
     enabled: true,
     path: member.registerPath,
+    nameRequired: member.nameRequired,
+    passwordRequired: member.passwordRequired,
     emailRequired: member.emailRequired,
     phoneRequired: member.phoneRequired,
     emailVerify,
@@ -181,10 +201,12 @@ export const getPublicRegisterConfig = cache(async () => {
 const NAME_RE = /^[^\s@]{2,32}$/u;
 
 export type RegisterInput = {
-  name: string;
+  /** 昵称；nameRequired 关闭时可留空，由系统生成唯一昵称。 */
+  name?: string;
   email?: string;
   phone?: string;
-  password: string;
+  /** 密码；passwordRequired 关闭时可留空（免密注册，事后可在账号中心补设）。 */
+  password?: string;
   /** 邮箱验证码（notify.register.emailVerify 开启且填了邮箱时必填）。 */
   emailCode?: string;
   /** 手机验证码（notify.register.phoneVerify 开启且填了手机号时必填）。 */
@@ -203,6 +225,23 @@ function normalizePhone(raw: string): string {
 
 const PHONE_LOCAL_RE = /^1[3-9]\d{9}$/;
 const PHONE_INTL_RE = /^\+\d{6,15}$/;
+
+/**
+ * 昵称非必填时的兜底生成器：「用户」+ 随机十六进制后缀，碰撞则重取，
+ * 保证最终落库的昵称唯一且满足 NAME_RE（2~32 字符、无空格与 @）。
+ */
+async function generateUniqueName(): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const candidate = `用户${crypto.randomBytes(4).toString("hex")}`;
+    const [taken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`lower(${users.name}) = lower(${candidate})`);
+    if (!taken) return candidate;
+  }
+  // 理论上 10 次随机不会连续碰撞；退回时间戳后缀兜底。
+  return `用户${Date.now().toString(36)}${crypto.randomBytes(2).toString("hex")}`.slice(0, 32);
+}
 
 /**
  * 公开联系方式目标的统一校验与归一化（注册与发送验证码接口共用同一套规则，
@@ -243,9 +282,32 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
     if (!hit) throw new ValidationError("邀请码无效");
   }
 
-  const name = input.name.trim();
-  if (!NAME_RE.test(name)) {
-    throw new ValidationError("昵称需为 2~32 个字符，且不能包含空格或 @");
+  // 昵称：填了就按格式校验；留空时按开关决定报错或生成唯一兜底昵称。
+  let name = input.name?.trim() ?? "";
+  if (name) {
+    if (!NAME_RE.test(name)) {
+      throw new ValidationError("昵称需为 2~32 个字符，且不能包含空格或 @");
+    }
+  } else if (member.nameRequired) {
+    throw new ValidationError("请填写昵称");
+  } else {
+    name = await generateUniqueName();
+  }
+
+  // 密码：填了校验长度；留空时按开关决定报错或免密注册（随机未知哈希 + 标记）。
+  const passwordRaw = input.password ?? "";
+  let passwordHash: string;
+  let passwordless = false;
+  if (passwordRaw) {
+    if (passwordRaw.length < 8 || passwordRaw.length > 200) {
+      throw new ValidationError("密码长度需为 8~200 个字符");
+    }
+    passwordHash = await hashPassword(passwordRaw);
+  } else if (member.passwordRequired) {
+    throw new ValidationError("请填写密码");
+  } else {
+    passwordHash = await hashPassword(crypto.randomBytes(24).toString("hex"));
+    passwordless = true;
   }
 
   // 邮箱按配置决定必填；空串/缺省一律视为未填写。
@@ -287,12 +349,15 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
   const emailVerifiedFlag = !!(emailRaw && notify.register.emailVerify);
   const phoneVerifiedFlag = !!(phoneRaw && notify.register.phoneVerify);
 
-  // 唯一校验全部走不区分大小写比较，避免 "Tom"/"tom" 造成登录歧义。
-  const [nameTaken] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(sql`lower(${users.name}) = lower(${name})`);
-  if (nameTaken) throw new ValidationError("昵称已被占用");
+  // 唯一校验全部走不区分大小写比较，避免 "Tom"/"tom" 造成登录歧义；
+  // 系统生成的昵称已保证唯一，这里仅需校验用户手填的昵称。
+  if (input.name?.trim()) {
+    const [nameTaken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(sql`lower(${users.name}) = lower(${name})`);
+    if (nameTaken) throw new ValidationError("昵称已被占用");
+  }
 
   if (emailRaw) {
     const [emailTaken] = await db
@@ -317,12 +382,15 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
       name,
       email: emailRaw || null,
       phone: phoneRaw || null,
-      passwordHash: await hashPassword(input.password),
+      passwordHash,
       role: member.defaultRole,
       emailVerified: emailVerifiedFlag,
       phoneVerified: phoneVerifiedFlag,
     })
     .returning();
+
+  // 免密注册：落库成功后打 nopassword 标记，用户事后可在账号中心补设密码。
+  if (passwordless) await addPasswordlessMark(row.id);
 
   return {
     id: row.id,

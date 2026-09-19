@@ -11,6 +11,10 @@ import {
 } from "@/lib/auth";
 import type { SessionUser } from "@/lib/auth";
 import { getOption, setOption } from "./options";
+import {
+  addPasswordlessMark,
+  getPasswordlessSet,
+} from "./passwordless-mark";
 import { getMemberSettings } from "./members";
 import { ServiceError, ValidationError, NotFoundError } from "./errors";
 
@@ -28,7 +32,6 @@ import { ServiceError, ValidationError, NotFoundError } from "./errors";
  */
 
 const SETTINGS_KEY = "oauth.settings";
-const NOPASSWORD_KEY = "oauth.nopassword";
 export const STATE_COOKIE = "oauth_state";
 
 export type PresetKind =
@@ -1031,29 +1034,6 @@ async function makeUniqueName(base: string): Promise<string> {
     if (!row) return candidate;
   }
   return `${base}_${crypto.randomBytes(2).toString("hex")}`.slice(0, 32);
-}
-
-async function getPasswordlessSet(): Promise<Set<number>> {
-  const arr = await getOption<number[]>(NOPASSWORD_KEY, []);
-  return new Set(Array.isArray(arr) ? arr : []);
-}
-
-async function addPasswordlessMark(userId: number): Promise<void> {
-  const set = await getPasswordlessSet();
-  set.add(userId);
-  await setOption(NOPASSWORD_KEY, [...set]);
-}
-
-/** 用户主动设置了密码后清除「无密码」标记（供账号密码接口调用）。 */
-export async function clearPasswordlessMark(userId: number): Promise<void> {
-  const set = await getPasswordlessSet();
-  if (set.delete(userId)) await setOption(NOPASSWORD_KEY, [...set]);
-}
-
-/** 该用户是否为「仅第三方登录、尚未设置自己密码」状态。 */
-export async function isPasswordlessUser(userId: number): Promise<boolean> {
-  const set = await getPasswordlessSet();
-  return set.has(userId);
 }
 
 async function touchIdentity(id: number, profile: NormalizedProfile): Promise<void> {

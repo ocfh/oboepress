@@ -38,8 +38,30 @@ const notifySchema = z.object({
   sms: z
     .object({
       enabled: z.boolean().optional(),
+      provider: z.enum(["webhook", "aliyun", "tencent"]).optional(),
       signature: z.string().max(40).optional(),
       webhook: webhookSchema.optional(),
+      aliyun: z
+        .object({
+          accessKeyId: z.string().max(200).optional(),
+          accessKeySecret: z.string().max(300).optional(),
+          signName: z.string().max(100).optional(),
+          templateCode: z.string().max(100).optional(),
+          codeParam: z.string().max(40).optional(),
+          endpoint: z.string().max(300).optional(),
+        })
+        .optional(),
+      tencent: z
+        .object({
+          secretId: z.string().max(200).optional(),
+          secretKey: z.string().max(300).optional(),
+          sdkAppId: z.string().max(64).optional(),
+          signName: z.string().max(100).optional(),
+          templateId: z.string().max(64).optional(),
+          region: z.string().max(64).optional(),
+          endpoint: z.string().max(300).optional(),
+        })
+        .optional(),
     })
     .optional(),
   register: z
@@ -48,11 +70,25 @@ const notifySchema = z.object({
       phoneVerify: z.boolean().optional(),
     })
     .optional(),
+  login: z
+    .object({
+      emailVerify: z.boolean().optional(),
+      phoneVerify: z.boolean().optional(),
+    })
+    .optional(),
 });
 
-/** 抹掉敏感字段后再下发。 */
-function masked<T extends { smtp: { pass: string } }>(s: T) {
-  return { ...s, smtp: { ...s.smtp, pass: "" } };
+/** 抹掉敏感字段后再下发：SMTP 密码与两家短信密钥。 */
+function masked<T extends { smtp: { pass: string }; sms: { aliyun: { accessKeySecret: string }; tencent: { secretKey: string } } }>(s: T) {
+  return {
+    ...s,
+    smtp: { ...s.smtp, pass: "" },
+    sms: {
+      ...s.sms,
+      aliyun: { ...s.sms.aliyun, accessKeySecret: "" },
+      tencent: { ...s.sms.tencent, secretKey: "" },
+    },
+  };
 }
 
 export async function GET() {

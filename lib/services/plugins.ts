@@ -154,3 +154,14 @@ export function ensurePluginsLoaded(): Promise<void> {
   });
   return pluginsInflight;
 }
+
+/**
+ * 丢弃插件缓存并立即重新装载全部已启用插件。用于备份整库恢复等绕过了正常
+ * 写服务、plugins 表可能已整体改变的场景（普通启停/设置保存在各自服务函数
+ * 内已自行失效，无需调用这里）。
+ */
+export async function reloadPlugins(): Promise<void> {
+  invalidatePluginCache();
+  pluginsReady = false;
+  await ensurePluginsLoaded();
+}

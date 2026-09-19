@@ -211,8 +211,8 @@ export function getThemeTemplates(
  * 一半是别主题的白下发）。显式映射让每个主题各自成块，仅当前启用主题会被
  * 加载；真正共用的工具仍由 splitChunks 自动提取为小公共块。
  *
- * 键用 manifest.slug（运行时实际传入值）。scottstudio-thyuu 的目录名是历史
- * 遗留的 oboepress-2032，两个键都指向该目录。
+ * 键用 manifest.slug（运行时实际传入值）。scottstudio-thyuu（历史目录名
+ * oboepress-2032）已随主题瘦身移除，不再保留映射。
  */
 // 模块值保持 any：与原全动态 import 的推导结果一致，各主题 index 还允许导出
 // manifest.settingsSchema 的兼容形态（{ sections: [...] }），不在这里做严格收窄。
@@ -222,8 +222,6 @@ const THEME_LOADERS: Record<string, () => Promise<any>> = {
   default: () => import("@/themes/default"),
   pseudolinear: () => import("@/themes/pseudolinear"),
   skyscraper: () => import("@/themes/skyscraper"),
-  "scottstudio-thyuu": () => import("@/themes/oboepress-2032"),
-  "oboepress-2032": () => import("@/themes/oboepress-2032"),
 };
 
 /**

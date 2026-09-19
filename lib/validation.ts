@@ -160,10 +160,12 @@ export const loginSchema = z.object({
  * registerMember 统一校验（中国大陆 11 位或 E.164）。
  */
 export const registerSchema = z.object({
-  name: z.string().trim().min(2).max(32),
+  // 昵称/密码是否必填由 memberSettings 决定；留空时服务层分别生成昵称、
+  // 走免密注册，这里只限制「填了的情况下」的最大长度。
+  name: z.string().trim().max(32).optional(),
   email: z.string().trim().max(120).optional(),
   phone: z.string().trim().max(20).optional(),
-  password: z.string().min(8).max(200),
+  password: z.string().max(200).optional(),
   captcha: z.string().trim().max(200).optional(),
   // 邀请码，是否必需由服务端会员设置（inviteOnly）决定。
   inviteCode: z.string().trim().max(64).optional(),
@@ -172,10 +174,22 @@ export const registerSchema = z.object({
   phoneCode: z.string().trim().max(8).optional(),
 });
 
-/** 公开获取邮箱/短信验证码。 */
+/** 公开获取邮箱/短信验证码（注册码或登录码，缺省按注册码兼容旧前端）。 */
 export const sendCodeSchema = z.object({
   channel: z.enum(["email", "sms"]),
   target: z.string().trim().min(3).max(160),
+  // bind 为登录态「账号中心」绑定/换绑邮箱、手机专用。
+  purpose: z.enum(["register", "login", "bind"]).optional(),
+  // 登录场景可能附带图形验证码（按后台安全配置决定是否校验）。
+  captcha: z.string().trim().max(200).optional(),
+});
+
+/** 邮箱/手机验证码免密登录（通道由通知设置的 login 开关门控）。 */
+export const loginCodeSchema = z.object({
+  channel: z.enum(["email", "sms"]),
+  target: z.string().trim().min(3).max(160),
+  code: z.string().trim().min(4).max(8),
+  captcha: z.string().trim().max(200).optional(),
 });
 
 /** A logged-in user changing their own password (requires current password). */
@@ -221,10 +235,17 @@ export const twoFaActionSchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-/** A logged-in user editing their own display name + email. */
+/**
+ * A logged-in user editing their own display name + email + phone.
+ * 邮箱/手机换绑成新值时，路由层必须消费一枚 purpose=bind 的验证码；
+ * phone 传空串表示解绑手机（解绑不要求验证码）。
+ */
 export const profileSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email().max(120),
+  phone: z.string().trim().max(20).optional(),
+  emailCode: z.string().trim().min(4).max(8).optional(),
+  phoneCode: z.string().trim().min(4).max(8).optional(),
 });
 
 /** First-run setup: create the initial admin + site identity. */
@@ -346,6 +367,9 @@ export const commentInputSchema = z.object({
   authorEmail: z.string().email().max(120).optional(),
   authorUrl: z.string().max(300).optional(),
   content: z.string().min(1).max(2000),
+  // 人机验证插件透传字段（核心不解释语义，由 comment.submission 钩子消费）
+  captchaToken: z.string().max(500).optional(),
+  captchaAnswer: z.string().max(20).optional(),
 });
 
 export const menuItemSchema = z.object({

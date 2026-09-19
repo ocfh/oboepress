@@ -7,7 +7,7 @@ import type { UserInput } from "@/lib/validation";
 import { can } from "@/lib/rbac";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
-import { clearPasswordlessMark, isPasswordlessUser } from "./oauth";
+import { clearPasswordlessMark, isPasswordlessUser } from "./passwordless-mark";
 import { bump } from "./public-cache";
 
 function publicUser(u: User) {
@@ -146,17 +146,34 @@ export async function updateUser(
 }
 
 /**
- * Update the current user's own display name + email (self-service profile
- * box). Email uniqueness is enforced; role/password stay untouched.
+ * 账号中心自助资料：读取当前用户的昵称/邮箱/手机。不经 RBAC 门控，
+ * 因为任何登录用户（含 member）都需要它渲染自己的资料卡。
+ */
+export async function getOwnProfile(
+  actor: SessionUser,
+): Promise<{ id: number; name: string; email: string | null; phone: string | null }> {
+  const [row] = await db
+    .select({ id: users.id, name: users.name, email: users.email, phone: users.phone })
+    .from(users)
+    .where(eq(users.id, actor.id));
+  if (!row) throw new NotFoundError("用户不存在");
+  return row;
+}
+
+/**
+ * Update the current user's own display name + email + phone (self-service
+ * profile box). 邮箱/手机唯一性在服务层兜底；换绑的验证码消费由路由层完成，
+ * role/password 保持不动。phone 传 null 表示解绑手机。
  */
 export async function changeOwnProfile(
   actor: SessionUser,
-  input: { name: string; email: string },
+  input: { name: string; email: string; phone?: string | null },
 ): Promise<Omit<User, "passwordHash">> {
   const [target] = await db.select().from(users).where(eq(users.id, actor.id));
   if (!target) throw new NotFoundError("用户不存在");
   const name = input.name.trim();
   const email = input.email.trim();
+  const phone = input.phone === undefined ? target.phone : input.phone || null;
   if (email !== target.email) {
     const [exists] = await db
       .select({ id: users.id })
@@ -164,9 +181,16 @@ export async function changeOwnProfile(
       .where(eq(users.email, email));
     if (exists) throw new ValidationError("邮箱已被其他账号使用");
   }
+  if (phone && phone !== target.phone) {
+    const [taken] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, phone), ne(users.id, actor.id)));
+    if (taken) throw new ValidationError("手机号已被其他账号使用");
+  }
   const [row] = await db
     .update(users)
-    .set({ name, email, updatedAt: new Date() })
+    .set({ name, email, phone, updatedAt: new Date() })
     .where(eq(users.id, actor.id))
     .returning();
   bump("posts");
@@ -219,6 +243,25 @@ export async function findUserByAccount(account: string): Promise<User | null> {
       identifier.includes("@")
         ? sql`lower(${users.email}) = lower(${identifier})`
         : sql`lower(${users.name}) = lower(${identifier})`,
+    );
+  return row ?? null;
+}
+
+/**
+ * 按联系方式查用户：邮箱大小写不敏感，手机号精确匹配。
+ * 供邮箱/手机验证码登录复用，返回整行（含 status）由调用方裁决。
+ */
+export async function findUserByContact(
+  channel: "email" | "sms",
+  target: string,
+): Promise<User | null> {
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(
+      channel === "email"
+        ? sql`lower(${users.email}) = lower(${target})`
+        : sql`${users.phone} = ${target}`,
     );
   return row ?? null;
 }

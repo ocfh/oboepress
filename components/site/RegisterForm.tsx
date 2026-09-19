@@ -13,6 +13,8 @@ import { User, Mail, Smartphone, Lock, ShieldCheck, Loader2, ArrowLeft, KeyRound
 export type RegisterConfig = {
   enabled: boolean;
   path: string | null;
+  nameRequired: boolean;
+  passwordRequired: boolean;
   emailRequired: boolean;
   phoneRequired: boolean;
   emailVerify: boolean;
@@ -143,11 +145,19 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
     e.preventDefault();
     setError("");
     // 前置轻校验，服务端仍会完整复核。
-    if (name.trim().length < 2) {
+    if (config.nameRequired && name.trim().length < 2) {
       setError("昵称至少 2 个字符");
       return;
     }
-    if (password.length < 8) {
+    if (name.trim() && name.trim().length > 32) {
+      setError("昵称最多 32 个字符");
+      return;
+    }
+    if (config.passwordRequired && password.length < 8) {
+      setError("密码至少 8 位");
+      return;
+    }
+    if (password && password.length < 8) {
       setError("密码至少 8 位");
       return;
     }
@@ -177,10 +187,10 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
+          ...(name.trim() ? { name: name.trim() } : {}),
           ...(email.trim() ? { email: email.trim() } : {}),
           ...(phone.trim() ? { phone: phone.trim() } : {}),
-          password,
+          ...(password ? { password } : {}),
           ...(config.inviteOnly ? { inviteCode: inviteCode.trim() } : {}),
           ...(config.emailVerify && email.trim()
             ? { emailCode: emailCode.trim() }
@@ -212,7 +222,7 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
       <div>
         <label className={labelCls} style={{ color: "var(--text-color-2)" }}>
           <User size={15} style={{ color: "var(--text-color-3)" }} />
-          昵称
+          昵称{config.nameRequired ? "" : "（可选）"}
         </label>
         <input
           type="text"
@@ -220,10 +230,14 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
           onChange={(e) => setName(e.target.value)}
           maxLength={32}
           autoComplete="username"
-          placeholder="2~32 个字符，注册后用于登录"
+          placeholder={
+            config.nameRequired
+              ? "2~32 个字符，注册后用于登录"
+              : "留空将自动生成昵称"
+          }
           className={inputCls}
           style={{ borderColor: "var(--border-color)" }}
-          required
+          required={config.nameRequired}
         />
       </div>
 
@@ -306,19 +320,19 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
       <div>
         <label className={labelCls} style={{ color: "var(--text-color-2)" }}>
           <Lock size={15} style={{ color: "var(--text-color-3)" }} />
-          密码
+          密码{config.passwordRequired ? "" : "（可选）"}
         </label>
         <input
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          minLength={8}
+          minLength={config.passwordRequired ? 8 : undefined}
           maxLength={200}
           autoComplete="new-password"
-          placeholder="至少 8 位"
+          placeholder={config.passwordRequired ? "至少 8 位" : "留空可免密注册，事后可补设"}
           className={inputCls}
           style={{ borderColor: "var(--border-color)" }}
-          required
+          required={config.passwordRequired}
         />
       </div>
 

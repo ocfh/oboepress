@@ -1,6 +1,7 @@
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import { encodeTextResponse } from "@/lib/http/encode";
 
 /**
  * 主题样式表输出口：/theme-style/<slug>?v=<mtime 版本串>
@@ -63,7 +64,9 @@ export async function GET(
   const extra = extraStat ? readFileSync(extraPath, "utf-8") : "";
   const body = extra ? `${main}\n${extra}` : main;
 
-  return new NextResponse(body, {
+  // 自托管 next start 不压缩 Route Handler 文本响应，113KB CSS 明文下发，
+  // 按 Accept-Encoding 协商 gzip（ETag 关联未编码实体，304 分支不受影响）
+  return encodeTextResponse(req, body, {
     headers: {
       "Content-Type": "text/css; charset=utf-8",
       "Cache-Control": IMMUTABLE,

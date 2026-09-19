@@ -2,6 +2,7 @@ import { authenticate, authorize, handleError, ok, readJson } from "@/lib/http";
 import { getSession } from "@/lib/auth";
 import { postInputSchema } from "@/lib/validation";
 import * as posts from "@/lib/services/posts";
+import { encodeTextResponse } from "@/lib/http/encode";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,11 @@ export async function GET(req: Request) {
   const session = await getSession();
   if (!session) opts.status = "published";
   try {
-    return ok(await posts.listPosts(opts));
+    // 列表是前台搜索弹窗的热路径（约 19KB JSON），按 AE 协商压缩至约 4KB
+    const data = await posts.listPosts(opts);
+    return encodeTextResponse(req, JSON.stringify(data), {
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+    });
   } catch (e) {
     return handleError(e);
   }

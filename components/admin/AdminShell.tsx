@@ -27,6 +27,7 @@ import {
   FileQuestion,
   ScrollText,
   Download,
+  DatabaseBackup,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
@@ -57,6 +58,7 @@ const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adm
   { href: "/admin/notify", label: "通知验证码", icon: Bell, superOnly: true },
   { href: "/admin/users", label: "用户", icon: Users, superOnly: true },
   { href: "/admin/export", label: "内容导出", icon: Download, superOnly: true },
+  { href: "/admin/backup", label: "备份与恢复", icon: DatabaseBackup, superOnly: true },
 ];
 
 const STANDALONE = ["/admin/login", "/admin/setup"];

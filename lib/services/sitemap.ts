@@ -3,8 +3,10 @@
  *
  * 内建输出一份符合 sitemaps.org 0.9 规范的 urlset（含 lastmod、changefreq、
  * priority），并在渲染前触发 `sitemap.urls` 异步过滤器——高级 sitemap 插件
- * 可借此增删条目、注入 `<image:image>` 扩展。robots.txt 同理走 `robots.rules`
- * 过滤器。两个输出都强制先 ensurePluginsLoaded()，保证插件钩子已注册。
+ * 可借此增删条目、注入 `<image:image>` 扩展。随后触发 `sitemap.document`
+ * 过滤器：插件可把默认文档替换成 sitemapindex（50000 条 / 50MB 超量分片），
+ * 或认领 ?kind=news、?part=n 等查询参数。robots.txt 走 `robots.rules`
+ * 过滤器。所有输出都强制先 ensurePluginsLoaded()，保证插件钩子已注册。
  */
 import { applyAsyncFilters, applyFilters, HOOKS } from "@/lib/hooks";
 import { listPosts } from "./posts";
@@ -47,6 +49,22 @@ export type SitemapPayload = {
   pages: PageItem[];
   categories: CategoryItem[];
   tags: TagItem[];
+};
+
+/** 一份可直接作为 Route Handler 文本响应输出的 XML 文档。 */
+export type SitemapDocument = {
+  contentType: string;
+  xml: string;
+};
+
+/**
+ * `sitemap.document` 过滤器载荷：核心默认只在"无任何查询参数"时填充 doc；
+ * 带参数请求（?part=、?kind= 等插件约定参数）doc 从 null 开始，由插件认领，
+ * 无人认领则路由返回 404。
+ */
+export type SitemapDocumentPayload = SitemapPayload & {
+  searchParams: URLSearchParams;
+  doc: SitemapDocument | null;
 };
 
 export type RobotsPayload = {
@@ -173,7 +191,8 @@ async function buildEntries(base: string): Promise<SitemapPayload> {
   };
 }
 
-function entryXml(e: SitemapEntry): string {
+/** 单条 <url> 序列化（导出供高级 sitemap 插件做分片字节预算时复用）。 */
+export function renderSitemapEntry(e: SitemapEntry): string {
   const parts = [`<loc>${esc(e.loc)}</loc>`];
   if (e.lastmod) parts.push(`<lastmod>${e.lastmod}</lastmod>`);
   if (e.changefreq && CHANGEFREQS.has(e.changefreq)) {
@@ -194,24 +213,70 @@ function entryXml(e: SitemapEntry): string {
   return `<url>${parts.join("")}</url>`;
 }
 
-export async function buildSitemapXml(req: Request): Promise<string> {
-  const base = originFromRequest(req);
-  const payload = await buildEntries(base);
-
-  await ensurePluginsLoaded();
-  const filtered = await applyAsyncFilters(HOOKS.sitemapUrls, payload);
-
-  const hasImages = filtered.entries.some((e) => (e.images?.length ?? 0) > 0);
+/** 完整 urlset 文档（分片插件必须复用此渲染器，保证与主地图逐字节同构）。 */
+export function renderSitemapUrlset(entries: SitemapEntry[]): string {
+  const hasImages = entries.some((e) => (e.images?.length ?? 0) > 0);
   const ns = hasImages
     ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"'
     : "";
-  const body = filtered.entries
-    .map((e) => entryXml(e))
-    .join("\n");
+  const body = entries.map((e) => renderSitemapEntry(e)).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"${ns}>
 ${body}
 </urlset>`;
+}
+
+/** sitemapindex 文档（超量分片时由高级 sitemap 插件输出）。 */
+export function renderSitemapIndex(
+  items: { loc: string; lastmod?: string }[],
+): string {
+  const body = items
+    .map(
+      (it) =>
+        `<sitemap><loc>${esc(it.loc)}</loc>${
+          it.lastmod ? `<lastmod>${it.lastmod}</lastmod>` : ""
+        }</sitemap>`,
+    )
+    .join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${body}
+</sitemapindex>`;
+}
+
+/**
+ * 组装条目并跑完 `sitemap.urls` 过滤器（插件增删条目、图片扩展等都在此
+ * 落地）。默认地图与分片/新闻地图共用同一份结果，保证内容一致。
+ */
+export async function buildSitemapPayload(req: Request): Promise<SitemapPayload> {
+  const base = originFromRequest(req);
+  const payload = await buildEntries(base);
+  await ensurePluginsLoaded();
+  return applyAsyncFilters(HOOKS.sitemapUrls, payload);
+}
+
+/**
+ * /sitemap.xml 的统一文档入口：
+ * - 无查询参数：核心给出默认 urlset，插件仍可经 `sitemap.document` 把它
+ *   整体替换成 sitemapindex（超量分片场景）；
+ * - 带任意查询参数：doc 从 null 开始，由插件认领（?kind=news、?part=n），
+ *   无人认领或分片号越界时返回 null，路由以 404 响应。
+ */
+export async function buildSitemapDocument(
+  req: Request,
+): Promise<SitemapDocument | null> {
+  const payload = await buildSitemapPayload(req);
+  const searchParams = new URL(req.url).searchParams;
+  const doc: SitemapDocument | null =
+    searchParams.size === 0
+      ? { contentType: "application/xml; charset=utf-8", xml: renderSitemapUrlset(payload.entries) }
+      : null;
+  const out = await applyAsyncFilters(HOOKS.sitemapDocument, {
+    ...payload,
+    searchParams,
+    doc,
+  } satisfies SitemapDocumentPayload);
+  return out.doc;
 }
 
 export async function buildRobotsTxt(req: Request): Promise<string> {

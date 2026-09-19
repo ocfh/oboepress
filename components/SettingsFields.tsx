@@ -208,6 +208,9 @@ export function Field({
     case "categoryRows":
       return <CategoryRowsField field={field} value={value} onChange={onChange} />;
 
+    case "verifications":
+      return <VerificationsField field={field} value={value} onChange={onChange} />;
+
     case "font":
       return (
         <div className="col-span-2">
@@ -604,6 +607,46 @@ function CategoryRowsField({
       >
         <Plus size={13} /> 添加分类区块
       </button>
+      {field.help && <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{field.help}</p>}
+    </div>
+  );
+}
+
+/**
+ * Webmaster verification codes (Google Search Console / Yandex / Bing / Yahoo).
+ * Stored as the single `verifications` jsonb object; emitted as <meta> tags.
+ */
+function VerificationsField({
+  field,
+  value,
+  onChange,
+}: {
+  field: SettingField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const map = value && typeof value === "object" ? (value as Record<string, string>) : {};
+  const providers = [
+    { key: "google", label: "Google", placeholder: "google-site-verification 内容" },
+    { key: "yandex", label: "Yandex", placeholder: "yandex-verification 内容" },
+    { key: "bing", label: "Bing", placeholder: "msvalidate.01 内容" },
+    { key: "yahoo", label: "Yahoo", placeholder: "y_key 内容" },
+  ];
+  return (
+    <div className="col-span-2">
+      <p className="mb-1.5 text-xs font-medium text-zinc-400">{field.label}</p>
+      <div className="grid grid-cols-2 gap-2">
+        {providers.map((p) => (
+          <div key={p.key}>
+            <input
+              value={map[p.key] ?? ""}
+              placeholder={`${p.label}：${p.placeholder}`}
+              onChange={(e) => onChange({ ...map, [p.key]: e.target.value })}
+              className={inputCls}
+            />
+          </div>
+        ))}
+      </div>
       {field.help && <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{field.help}</p>}
     </div>
   );

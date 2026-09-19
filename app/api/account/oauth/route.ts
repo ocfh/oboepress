@@ -8,10 +8,10 @@ import {
 } from "@/lib/http";
 import {
   getPublicProviders,
-  isPasswordlessUser,
   listUserIdentities,
   unbindUserIdentity,
 } from "@/lib/services/oauth";
+import { isPasswordlessUser } from "@/lib/services/passwordless-mark";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

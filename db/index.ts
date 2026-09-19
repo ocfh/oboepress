@@ -269,4 +269,26 @@ export const db = new Proxy({} as Database, {
   },
 }) as Database;
 
+/**
+ * 驱动无关的原始 SQL 入口：两种驱动的原生返回形状不同（postgres-js 直接
+ * 返回行数组，PGlite 返回 { rows }），备份等需要按 information_schema 动态
+ * 拼装 SQL 的场景统一在这里归一化为行数组。参数一律用 $1/$2 占位。
+ */
+export async function rawQuery<T = Record<string, unknown>>(
+  query: string,
+  params: unknown[] = [],
+): Promise<T[]> {
+  getDb();
+  if (driver === "postgres" && postgresClient) {
+    // postgres.js 对绑定参数有自己的联合类型；这里是透传原始 SQL 的边界，
+    // 调用方（备份服务）保证只传 JSON 可序列化标量。
+    return (await postgresClient.unsafe(query, params as never[])) as T[];
+  }
+  if (pgliteClient) {
+    const res = await pgliteClient.query<T>(query, params);
+    return res.rows;
+  }
+  throw new Error("数据库尚未初始化");
+}
+
 export { schema };

@@ -32,6 +32,8 @@ import {
   type SeoTarget,
 } from "@/lib/services/seo";
 import RawInjection from "@/components/RawInjection";
+import VirtualRoutePage from "@/components/site/VirtualRoutePage";
+import { resolveVirtualRoute } from "@/lib/services/virtual-routes";
 import PostCard from "@/components/shared/PostCard";
 import Sidebar from "@/components/shared/Sidebar";
 import Breadcrumb from "@/components/shared/Breadcrumb";
@@ -142,6 +144,21 @@ export async function generateMetadata({ params }: RouteProps): Promise<Metadata
     if (await resolveRegisterPage(segments)) {
       return { title: "注册", robots: { index: false, follow: false } };
     }
+    // 插件虚拟路由（如 friend-links 的 /links）：按普通页面输出 SEO 元数据。
+    const virtual = await resolveVirtualRoute(segments);
+    if (virtual) {
+      return buildEntityMetadata(
+        {
+          kind: "page",
+          title: virtual.title,
+          seoTitle: virtual.seoTitle,
+          seoDescription: virtual.seoDescription,
+          seoKeywords: virtual.seoKeywords,
+          url: virtual.path,
+        },
+        settings,
+      );
+    }
     return {};
   }
   return buildEntityMetadata(seoTargetFor(res, cfg), settings);
@@ -192,6 +209,10 @@ export default async function SiteCatchAll({ params, searchParams }: RouteProps)
         </div>
       );
     }
+    // 插件虚拟路由（如 friend-links 的 /links）：仍无人认领才落到 404。
+    // 与秘密入口/注册页同级，不经维护模式拦截（维护中站长也需对外开关控制）。
+    const virtual = await resolveVirtualRoute(segments);
+    if (virtual) return <VirtualRoutePage route={virtual} />;
     notFound();
   }
 

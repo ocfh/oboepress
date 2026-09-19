@@ -10,6 +10,8 @@ import {
   ShieldCheck,
   ArrowLeft,
   KeyRound,
+  Mail,
+  Smartphone,
 } from "lucide-react";
 import OAuthButtons from "@/components/shared/OAuthButtons";
 import type { PublicProvider } from "@/lib/services/oauth";
@@ -40,11 +42,22 @@ export default function AdminLogin() {
   // 已启用且配置完整的第三方登录提供商（公开端点，不含密钥）。
   const [providers, setProviders] = useState<PublicProvider[]>([]);
   // 找回密码模式：第一步发码，第二步凭码重置。
-  const [mode, setMode] = useState<"login" | "forgot">("login");
+  const [mode, setMode] = useState<"login" | "forgot" | "codelogin">("login");
   const [resetSent, setResetSent] = useState(false);
   const [resetCode, setResetCode] = useState("");
   const [resetPwd, setResetPwd] = useState("");
   const [okMsg, setOkMsg] = useState("");
+  // 验证码免密登录：可用通道由 /api/auth/login-config 按通知设置下发。
+  const [loginChannels, setLoginChannels] = useState<{
+    email: boolean;
+    sms: boolean;
+  } | null>(null);
+  const [codeChannel, setCodeChannel] = useState<"email" | "sms">("email");
+  const [codeTarget, setCodeTarget] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [codeCd, setCodeCd] = useState(0);
+  const [sendCodeErr, setSendCodeErr] = useState("");
 
   const refreshCaptcha = () => {
     setCaptchaCode("");
@@ -68,6 +81,16 @@ export default function AdminLogin() {
         if (d?.setupRequired) router.replace("/admin/setup");
       })
       .catch(() => {});
+    // 验证码登录通道（伪装开启时带秘密入口 Referer 才返回，失败按全关处理）。
+    fetch("/api/auth/login-config", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { email: false, sms: false }))
+      .then((d) => {
+        const ch = { email: !!d?.email, sms: !!d?.sms };
+        setLoginChannels(ch);
+        // 仅开通短信时默认切到短信通道。
+        if (!ch.email && ch.sms) setCodeChannel("sms");
+      })
+      .catch(() => setLoginChannels({ email: false, sms: false }));
     // 是否需要验证码（含伪装开启时的 Referer 门控，失败按关闭处理）。
     fetch("/api/captcha", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { enabled: false }))
@@ -181,6 +204,81 @@ export default function AdminLogin() {
     setOkMsg("");
   }
 
+  // 验证码登录：发送登录码（purpose=login，60s 倒计时仅为体验，服务端有频控）。
+  async function sendLoginCode() {
+    setError("");
+    setSendCodeErr("");
+    if (!codeTarget.trim()) {
+      setSendCodeErr(codeChannel === "email" ? "请先填写邮箱" : "请先填写手机号");
+      return;
+    }
+    setSendingCode(true);
+    try {
+      const res = await fetch("/api/auth/send-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: codeChannel,
+          target: codeTarget.trim(),
+          purpose: "login",
+        }),
+      });
+      if (res.ok) {
+        // 无论账号是否存在都提示已发送（服务端对不存在账号静默成功，防枚举）。
+        let left = 60;
+        setCodeCd(left);
+        const timer = setInterval(() => {
+          left -= 1;
+          setCodeCd(left);
+          if (left <= 0) clearInterval(timer);
+        }, 1000);
+        setOkMsg(
+          codeChannel === "email"
+            ? "若该邮箱已注册，登录码已发送，10 分钟内有效。"
+            : "若该手机号已注册，登录码已发送，10 分钟内有效。",
+        );
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      setSendCodeErr(data.error || "发送失败，请稍后再试");
+    } catch {
+      setSendCodeErr("网络异常，请稍后再试");
+    } finally {
+      setSendingCode(false);
+    }
+  }
+
+  async function submitCodeLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setOkMsg("");
+    setLoading(true);
+    const res = await fetch("/api/auth/login-code", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channel: codeChannel,
+        target: codeTarget.trim(),
+        code: loginCode.trim(),
+        ...(captchaCfg?.enabled ? { captcha: captchaCode } : {}),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.twoFactorRequired) {
+      setTwoFa({ ticket: data.ticket, type: data.challengeType ?? "totp" });
+      setTwoFaCode("");
+      setLoading(false);
+      return;
+    }
+    if (res.ok) {
+      enterAdmin();
+    } else {
+      setError(data.error || "登录失败");
+      setLoading(false);
+      if (captchaCfg?.mode === "builtin") refreshCaptcha();
+    }
+  }
+
   async function submitTwoFa(e: React.FormEvent) {
     e.preventDefault();
     if (!twoFa) return;
@@ -248,7 +346,15 @@ export default function AdminLogin() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4">
       <form
-        onSubmit={twoFa ? submitTwoFa : mode === "forgot" ? submitForgot : submit}
+        onSubmit={
+          twoFa
+            ? submitTwoFa
+            : mode === "forgot"
+              ? submitForgot
+              : mode === "codelogin"
+                ? submitCodeLogin
+                : submit
+        }
         className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900 p-8"
       >
         <div className="mb-6 flex items-center gap-3">
@@ -258,7 +364,13 @@ export default function AdminLogin() {
           <div>
             <h1 className="text-xl font-bold text-zinc-100">OboePress</h1>
             <p className="text-sm text-zinc-400">
-              {twoFa ? "两步验证" : mode === "forgot" ? "找回密码" : "登录管理后台"}
+              {twoFa
+                ? "两步验证"
+                : mode === "forgot"
+                  ? "找回密码"
+                  : mode === "codelogin"
+                    ? "验证码登录"
+                    : "登录管理后台"}
             </p>
           </div>
         </div>
@@ -347,6 +459,100 @@ export default function AdminLogin() {
               </>
             )}
           </>
+        ) : mode === "codelogin" ? (
+          <>
+            {loginChannels?.email && loginChannels?.sms && (
+              <div className="mb-3 flex gap-2">
+                {(["email", "sms"] as const).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      setCodeChannel(c);
+                      setSendCodeErr("");
+                    }}
+                    className={
+                      "flex flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition " +
+                      (codeChannel === c
+                        ? "border-indigo-500 bg-indigo-600/10 text-indigo-300"
+                        : "border-zinc-700 text-zinc-400 hover:border-zinc-500")
+                    }
+                  >
+                    {c === "email" ? <Mail size={13} /> : <Smartphone size={13} />}
+                    {c === "email" ? "邮箱" : "手机"}
+                  </button>
+                ))}
+              </div>
+            )}
+            <label className="flex items-center gap-2 text-sm text-zinc-300">
+              {codeChannel === "email" ? (
+                <Mail size={15} className="text-zinc-500" />
+              ) : (
+                <Smartphone size={15} className="text-zinc-500" />
+              )}
+              {codeChannel === "email" ? "登录邮箱" : "登录手机号"}
+            </label>
+            <input
+              type={codeChannel === "email" ? "email" : "tel"}
+              value={codeTarget}
+              onChange={(e) => setCodeTarget(e.target.value)}
+              autoComplete={codeChannel === "email" ? "email" : "tel"}
+              placeholder={
+                codeChannel === "email"
+                  ? "账号绑定的邮箱"
+                  : "账号绑定的手机号"
+              }
+              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+              required
+            />
+            <label className="mt-4 flex items-center gap-2 text-sm text-zinc-300">
+              <KeyRound size={15} className="text-zinc-500" />
+              登录验证码
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <input
+                value={loginCode}
+                onChange={(e) =>
+                  setLoginCode(e.target.value.replace(/\D/g, "").slice(0, 8))
+                }
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                placeholder="6 位验证码"
+                className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm tracking-widest outline-none focus:border-indigo-500"
+                required
+              />
+              <button
+                type="button"
+                onClick={sendLoginCode}
+                disabled={sendingCode || codeCd > 0}
+                className="shrink-0 whitespace-nowrap rounded-md border border-zinc-700 px-3 py-2 text-xs text-zinc-200 transition hover:border-zinc-500 disabled:opacity-50"
+              >
+                {sendingCode
+                  ? "发送中…"
+                  : codeCd > 0
+                    ? `${codeCd}s 后重发`
+                    : "发送验证码"}
+              </button>
+            </div>
+            {sendCodeErr && (
+              <p className="mt-1 text-xs text-red-400">{sendCodeErr}</p>
+            )}
+
+            {captchaBlock}
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError("");
+                setOkMsg("");
+                setSendCodeErr("");
+              }}
+              className="mt-4 inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+            >
+              <ArrowLeft size={13} /> 返回账号密码登录
+            </button>
+          </>
         ) : (
           <>
         <label className="flex items-center gap-2 text-sm text-zinc-300">
@@ -389,6 +595,23 @@ export default function AdminLogin() {
         />
 
         {captchaBlock}
+
+        {(loginChannels?.email || loginChannels?.sms) && (
+          <button
+            type="button"
+            onClick={() => {
+              setMode("codelogin");
+              setError("");
+              setOkMsg("");
+              setSendCodeErr("");
+              setLoginCode("");
+            }}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1 text-xs text-zinc-400 hover:text-zinc-200"
+          >
+            <Mail size={13} />
+            使用邮箱/手机验证码登录
+          </button>
+        )}
           </>
         )}
 
@@ -408,7 +631,9 @@ export default function AdminLogin() {
                 ? resetSent
                   ? "重置密码"
                   : "发送重置码"
-                : "登录"}
+                : mode === "codelogin"
+                  ? "验证码登录"
+                  : "登录"}
         </button>
 
         {!twoFa && mode === "forgot" && (

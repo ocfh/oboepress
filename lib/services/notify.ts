@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { db, ensureMigrations } from "@/db";
 import { verifyCodes } from "@/db/schema";
 import { and, desc, eq, isNull } from "drizzle-orm";
@@ -17,8 +18,9 @@ import { ValidationError } from "./errors";
 /**
  * 通知与验证码服务：
  * - 邮件：内置 SMTP（零依赖客户端，支持 465/587/25）或自定义 HTTP Webhook；
- * - 短信：仅走自定义 HTTP Webhook（各家短信网关签名差异大，统一模板化），
- *   URL / 请求体支持 {{target}} {{code}} {{sign}} 占位符；
+ * - 短信：三种通道——阿里云短信（POP RPC HMAC-SHA1 签名）、腾讯云短信
+ *   （TC3-HMAC-SHA256 签名）或自定义 HTTP Webhook（URL/体支持
+ *   {{target}} {{code}} {{sign}} 占位符）；两家签名均用 node:crypto 零依赖实现；
  * - 注册场景是否强制邮箱/手机验证码由 register.emailVerify/phoneVerify 决定，
  *   会员注册服务在写库前消费验证码。
  * 配置存 options KV（key=notifySettings），免表迁移。
@@ -33,6 +35,37 @@ export interface WebhookCfg {
   headers: string;
   /** 请求体模板（GET 时忽略），支持 {{target}} {{code}} {{sign}}。 */
   body: string;
+}
+
+export type SmsProvider = "webhook" | "aliyun" | "tencent";
+
+export interface AliyunSmsCfg {
+  accessKeyId: string;
+  /** 敏感字段：GET 掩码、保存时 undefined 保留原值、空串显式清空。 */
+  accessKeySecret: string;
+  /** 短信签名名称（阿里云控制台已审核签名，不带【】）。 */
+  signName: string;
+  /** 模板 CODE，如 SMS_123456789。 */
+  templateCode: string;
+  /** 模板变量名，默认 code（TemplateParam 为 {"code":"1234"}）。 */
+  codeParam: string;
+  /** 接入点根地址，留空走 https://dysmsapi.aliyuncs.com；国际站/私有化可改。 */
+  endpoint: string;
+}
+
+export interface TencentSmsCfg {
+  secretId: string;
+  /** 敏感字段，掩码规则同阿里云密钥。 */
+  secretKey: string;
+  /** SmsSdkAppId（短信应用 ID）。 */
+  sdkAppId: string;
+  signName: string;
+  /** 模板 ID，纯数字字符串。 */
+  templateId: string;
+  /** 地域，默认 ap-guangzhou，决定接入域名 sms.{region}.tencentcloudapi.com。 */
+  region: string;
+  /** 高级：自定义接入根地址（留空按地域推导）。 */
+  endpoint: string;
 }
 
 export interface NotifySettings {
@@ -51,11 +84,20 @@ export interface NotifySettings {
   };
   sms: {
     enabled: boolean;
-    /** 短信签名，如【OboePress】，供 Webhook 模板 {{sign}} 使用。 */
+    /** 投递提供方：自定义 Webhook / 阿里云 / 腾讯云。 */
+    provider: SmsProvider;
+    /** 短信签名原文，供 Webhook 模板 {{sign}} 使用。 */
     signature: string;
     webhook: WebhookCfg;
+    aliyun: AliyunSmsCfg;
+    tencent: TencentSmsCfg;
   };
   register: {
+    emailVerify: boolean;
+    phoneVerify: boolean;
+  };
+  /** 登录验证码通道开关（邮箱/手机验证码免密登录）。 */
+  login: {
     emailVerify: boolean;
     phoneVerify: boolean;
   };
@@ -68,11 +110,38 @@ const DEFAULT_WEBHOOK: WebhookCfg = {
   body: '{"target":"{{target}}","code":"{{code}}"}',
 };
 
+const DEFAULT_ALIYUN: AliyunSmsCfg = {
+  accessKeyId: "",
+  accessKeySecret: "",
+  signName: "",
+  templateCode: "",
+  codeParam: "code",
+  endpoint: "",
+};
+
+const DEFAULT_TENCENT: TencentSmsCfg = {
+  secretId: "",
+  secretKey: "",
+  sdkAppId: "",
+  signName: "",
+  templateId: "",
+  region: "ap-guangzhou",
+  endpoint: "",
+};
+
 const DEFAULT_SETTINGS: NotifySettings = {
   smtp: { host: "", port: 465, security: "TLS", user: "", pass: "", from: "" },
   email: { enabled: false, via: "smtp", webhook: { ...DEFAULT_WEBHOOK } },
-  sms: { enabled: false, signature: "OboePress", webhook: { ...DEFAULT_WEBHOOK } },
+  sms: {
+    enabled: false,
+    provider: "webhook",
+    signature: "OboePress",
+    webhook: { ...DEFAULT_WEBHOOK },
+    aliyun: { ...DEFAULT_ALIYUN },
+    tencent: { ...DEFAULT_TENCENT },
+  },
   register: { emailVerify: false, phoneVerify: false },
+  login: { emailVerify: false, phoneVerify: false },
 };
 
 function mergeWebhook(cur: WebhookCfg, raw: Partial<WebhookCfg> | undefined): WebhookCfg {
@@ -104,8 +173,11 @@ export const getNotifySettings = cache(async (): Promise<NotifySettings> => {
       ...DEFAULT_SETTINGS.sms,
       ...(stored.sms ?? {}),
       webhook: mergeWebhook({ ...DEFAULT_WEBHOOK }, stored.sms?.webhook),
+      aliyun: { ...DEFAULT_ALIYUN, ...(stored.sms?.aliyun ?? {}) },
+      tencent: { ...DEFAULT_TENCENT, ...(stored.sms?.tencent ?? {}) },
     },
     register: { ...DEFAULT_SETTINGS.register, ...(stored.register ?? {}) },
+    login: { ...DEFAULT_SETTINGS.login, ...(stored.login ?? {}) },
   };
 });
 
@@ -136,26 +208,93 @@ export async function saveNotifySettings(
       via: input.email?.via === "webhook" ? "webhook" : "smtp",
       webhook: mergeWebhook(cur.email.webhook, input.email?.webhook),
     },
-    sms: {
-      enabled: !!input.sms?.enabled,
-      signature: String(input.sms?.signature ?? cur.sms.signature).trim(),
-      webhook: mergeWebhook(cur.sms.webhook, input.sms?.webhook),
-    },
+    sms: (() => {
+      const raw = input.sms ?? {};
+      const provider: SmsProvider =
+        raw.provider === "aliyun" || raw.provider === "tencent" || raw.provider === "webhook"
+          ? raw.provider
+          : cur.sms.provider;
+      // 敏感密钥：undefined（掩码表单未重填）保留原值；空串显式清空。
+      const keepSecret = (oldVal: string, v: unknown) =>
+        typeof v === "undefined" ? oldVal : String(v);
+      const text = (oldVal: string, v: unknown, max = 200) =>
+        typeof v === "string" ? v.trim().slice(0, max) : oldVal;
+      const nextSms: NotifySettings["sms"] = {
+        enabled: !!raw.enabled,
+        provider,
+        signature: text(cur.sms.signature, raw.signature, 40),
+        webhook: mergeWebhook(cur.sms.webhook, raw.webhook),
+        aliyun: {
+          accessKeyId: text(cur.sms.aliyun.accessKeyId, raw.aliyun?.accessKeyId),
+          accessKeySecret: keepSecret(cur.sms.aliyun.accessKeySecret, raw.aliyun?.accessKeySecret),
+          signName: text(cur.sms.aliyun.signName, raw.aliyun?.signName, 100),
+          templateCode: text(cur.sms.aliyun.templateCode, raw.aliyun?.templateCode, 100),
+          codeParam: text(cur.sms.aliyun.codeParam || "code", raw.aliyun?.codeParam, 40) || "code",
+          endpoint: text(cur.sms.aliyun.endpoint, raw.aliyun?.endpoint, 300),
+        },
+        tencent: {
+          secretId: text(cur.sms.tencent.secretId, raw.tencent?.secretId),
+          secretKey: keepSecret(cur.sms.tencent.secretKey, raw.tencent?.secretKey),
+          sdkAppId: text(cur.sms.tencent.sdkAppId, raw.tencent?.sdkAppId, 64),
+          signName: text(cur.sms.tencent.signName, raw.tencent?.signName, 100),
+          templateId: text(cur.sms.tencent.templateId, raw.tencent?.templateId, 64),
+          region: text(cur.sms.tencent.region || "ap-guangzhou", raw.tencent?.region, 64) || "ap-guangzhou",
+          endpoint: text(cur.sms.tencent.endpoint, raw.tencent?.endpoint, 300),
+        },
+      };
+      // 仅在启用时校验所选通道必填项；自定义 endpoint 必须是 http(s) 根地址。
+      if (nextSms.enabled) {
+        const endpointOk = (u: string) => {
+          if (!u) return;
+          let parsed: URL;
+          try {
+            parsed = new URL(u);
+          } catch {
+            throw new ValidationError("短信接入点地址不是合法 URL");
+          }
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            throw new ValidationError("短信接入点地址仅支持 http/https");
+          }
+        };
+        if (provider === "aliyun") {
+          const a = nextSms.aliyun;
+          if (!a.accessKeyId || !a.accessKeySecret || !a.signName || !a.templateCode) {
+            throw new ValidationError("阿里云短信缺少 AccessKey、签名或模板等必填配置");
+          }
+          endpointOk(a.endpoint);
+        } else if (provider === "tencent") {
+          const t = nextSms.tencent;
+          if (!t.secretId || !t.secretKey || !t.sdkAppId || !t.signName || !t.templateId) {
+            throw new ValidationError("腾讯云短信缺少 SecretId、SdkAppId、签名或模板等必填配置");
+          }
+          endpointOk(t.endpoint);
+        }
+      }
+      return nextSms;
+    })(),
     register: {
       emailVerify: !!input.register?.emailVerify,
       phoneVerify: !!input.register?.phoneVerify,
+    },
+    login: {
+      emailVerify: !!input.login?.emailVerify,
+      phoneVerify: !!input.login?.phoneVerify,
     },
   };
   await setOption(OPTION_KEY, next);
   return next;
 }
 
-/** 模板占位符替换；取值时做 JSON 转义之外保持原样（目标均为受控配置）。 */
-function renderTpl(tpl: string, vars: Record<string, string>): string {
+/**
+ * 模板占位符替换；取值时做 JSON 转义之外保持原样（目标均为受控配置）。
+ * 同时供自定义验证码校验请求（captcha.ts）复用，避免两份模板实现漂移。
+ */
+export function renderTpl(tpl: string, vars: Record<string, string>): string {
   return tpl.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => vars[k] ?? "");
 }
 
-function parseHeaders(raw: string): Record<string, string> {
+/** 请求头原文解析：JSON 对象（{ 开头）或每行 `Key: Value`；JSON 损坏抛 422。 */
+export function parseHeaders(raw: string): Record<string, string> {
   const out: Record<string, string> = {};
   const text = raw.trim();
   if (!text) return out;
@@ -202,6 +341,165 @@ async function invokeWebhook(cfg: WebhookCfg, vars: Record<string, string>): Pro
   }
 }
 
+// --- 预置短信服务商（零依赖，node:crypto 签名） ---
+
+const ALIYUN_SMS_ENDPOINT = "https://dysmsapi.aliyuncs.com";
+const TENCENT_SMS_VERSION = "2021-01-11";
+
+/** 带超时的 fetch，网络/超时统一由调用方包成中文业务错误。 */
+function timeoutFetch(url: string, init: RequestInit, ms = 8000): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...init, signal: ctrl.signal, cache: "no-store" }).finally(() =>
+    clearTimeout(timer),
+  );
+}
+
+/** POP 签名专用百分号编码：encodeURIComponent 后修正 + * ~ 三字符。 */
+function pctEncode(s: string): string {
+  return encodeURIComponent(s)
+    .replace(/\+/g, "%20")
+    .replace(/\*/g, "%2A")
+    .replace(/%7E/g, "~");
+}
+
+/** 手机号归一化：大陆 11 位自动补 +86；已带 + 或其他原文透传。 */
+function normalizePhone(raw: string): string {
+  const s = raw.replace(/[\s-]/g, "");
+  if (s.startsWith("+")) return s;
+  if (/^1\d{10}$/.test(s)) return `+86${s}`;
+  return /^\d+$/.test(s) ? `+${s}` : s;
+}
+
+/**
+ * 阿里云短信 SendSms（POP RPC 风格签名）：
+ * 公共参数 + 业务参数按字典序拼规范查询串，HMAC-SHA1(key=Secret&) 后 Base64。
+ * 参考：https://help.aliyun.com/document_detail/101342（RPC 签名机制）。
+ */
+async function sendViaAliyunSms(cfg: AliyunSmsCfg, phone: string, code: string): Promise<void> {
+  const params: Record<string, string> = {
+    Action: "SendSms",
+    Version: "2017-05-25",
+    Format: "JSON",
+    RegionId: "cn-hangzhou",
+    AccessKeyId: cfg.accessKeyId,
+    SignatureMethod: "HMAC-SHA1",
+    SignatureVersion: "1.0",
+    SignatureNonce: randomUUID(),
+    Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    PhoneNumbers: phone,
+    SignName: cfg.signName,
+    TemplateCode: cfg.templateCode,
+    TemplateParam: JSON.stringify({ [cfg.codeParam || "code"]: code }),
+  };
+  const canonical = Object.keys(params)
+    .sort()
+    .map((k) => `${pctEncode(k)}=${pctEncode(params[k])}`)
+    .join("&");
+  const stringToSign = `GET&${pctEncode("/")}&${pctEncode(canonical)}`;
+  const signature = createHmac("sha1", `${cfg.accessKeySecret}&`)
+    .update(stringToSign)
+    .digest("base64");
+  const base = (cfg.endpoint || ALIYUN_SMS_ENDPOINT).replace(/\/+$/, "");
+  const url = `${base}/?${canonical}&Signature=${pctEncode(signature)}`;
+  let res: Response;
+  try {
+    res = await timeoutFetch(url, { method: "GET" });
+  } catch {
+    throw new ValidationError("短信服务暂不可用，请稍后再试");
+  }
+  let j: { Code?: string; Message?: string } | null = null;
+  try {
+    j = (await res.json()) as { Code?: string; Message?: string };
+  } catch {
+    throw new ValidationError("短信服务响应解析失败");
+  }
+  // 成功响应为 {"Message":"OK","RequestId":"...","Code":"OK","BizId":"..."}。
+  // 仅把业务码透传给后台（isv.BUSINESS_LIMIT_CONTROL 等），不回传含手机号的 Message。
+  if (!res.ok || j.Code !== "OK") {
+    throw new ValidationError(`短信发送失败${j.Code ? `（${j.Code}）` : ""}`);
+  }
+}
+
+/**
+ * 腾讯云短信 SendSms（TC3-HMAC-SHA256 签名 v3）：
+ * canonical request → stringToSign → 三级派生密钥签名，零依赖实现。
+ * 参考：https://cloud.tencent.com/document/product/382/55981。
+ */
+async function sendViaTencentSms(cfg: TencentSmsCfg, phone: string, code: string): Promise<void> {
+  const origin = (
+    cfg.endpoint || `https://sms.${cfg.region || "ap-guangzhou"}.tencentcloudapi.com`
+  ).replace(/\/+$/, "");
+  const host = new URL(origin).host;
+  const payload = JSON.stringify({
+    PhoneNumberSet: [normalizePhone(phone)],
+    SmsSdkAppId: cfg.sdkAppId,
+    SignName: cfg.signName,
+    TemplateId: cfg.templateId,
+    // 验证码模板只有一个变量；多变量模板不适用验证码场景。
+    TemplateParamSet: [code],
+  });
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const sha256Hex = (data: string): string => createHash("sha256").update(data).digest("hex");
+  const hmac = (key: Buffer | string, data: string): Buffer =>
+    createHmac("sha256", key).update(data).digest();
+
+  const canonical = [
+    "POST",
+    "/",
+    "",
+    "content-type:application/json; charset=utf-8",
+    `host:${host}`,
+    "x-tc-action:sendsms",
+    "",
+    "content-type;host;x-tc-action",
+    sha256Hex(payload),
+  ].join("\n");
+  const date = new Date().toISOString().slice(0, 10);
+  const scope = `${date}/sms/tc3_request`;
+  const stringToSign = ["TC3-HMAC-SHA256", timestamp, scope, sha256Hex(canonical)].join("\n");
+  const secretSigning = hmac(hmac(hmac(`TC3${cfg.secretKey}`, date), "sms"), "tc3_request");
+  const signature = createHmac("sha256", secretSigning).update(stringToSign).digest("hex");
+  const authorization =
+    `TC3-HMAC-SHA256 Credential=${cfg.secretId}/${scope}, ` +
+    "SignedHeaders=content-type;host;x-tc-action, " +
+    `Signature=${signature}`;
+
+  let res: Response;
+  try {
+    res = await timeoutFetch(`${origin}/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        Authorization: authorization,
+        "X-TC-Action": "SendSms",
+        "X-TC-Version": TENCENT_SMS_VERSION,
+        "X-TC-Timestamp": timestamp,
+      },
+      body: payload,
+    });
+  } catch {
+    throw new ValidationError("短信服务暂不可用，请稍后再试");
+  }
+  type TencentSmsResult = {
+    Response?: {
+      Error?: { Code?: string };
+      SendStatusSet?: { Code?: string; Message?: string }[];
+    };
+  };
+  let j: TencentSmsResult | null = null;
+  try {
+    j = (await res.json()) as TencentSmsResult;
+  } catch {
+    throw new ValidationError("短信服务响应解析失败");
+  }
+  const st = j?.Response?.SendStatusSet?.[0];
+  if (!res.ok || !st || st.Code !== "Ok") {
+    const code0 = st?.Code || j?.Response?.Error?.Code || "";
+    throw new ValidationError(`短信发送失败${code0 ? `（${code0}）` : ""}`);
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
     c === "&" ? "&amp;" : c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === '"' ? "&quot;" : "&#39;",
@@ -244,6 +542,14 @@ async function deliverViaEmail(
 async function deliverViaSms(to: string, code: string) {
   const s = await getNotifySettings();
   if (!s.sms.enabled) throw new ValidationError("短信通道未开启");
+  if (s.sms.provider === "aliyun") {
+    await sendViaAliyunSms(s.sms.aliyun, to, code);
+    return;
+  }
+  if (s.sms.provider === "tencent") {
+    await sendViaTencentSms(s.sms.tencent, to, code);
+    return;
+  }
   await invokeWebhook(s.sms.webhook, {
     target: to,
     code,
@@ -311,8 +617,8 @@ export async function sendTestMessage(channel: CodeChannel, target: string): Pro
       { code: "888888", purpose: "test" },
     );
   } else {
-    const s = await getNotifySettings();
-    await invokeWebhook(s.sms.webhook, { target, code: "888888", sign: s.sms.signature, purpose: "test" });
+    // 三种短信通道统一走投递入口，测试码 888888 仅用于验证链路。
+    await deliverViaSms(target, "888888");
   }
 }
 

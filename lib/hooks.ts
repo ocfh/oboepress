@@ -179,6 +179,15 @@ export const HOOKS = {
   commentCreated: "comment.created",
   /** filter — ({ comment, approved }) decide auto-approval */
   commentApprove: "comment.approve",
+  /**
+   * async filter — ({ data, userId, ip, reject }) runs on POST /api/comments
+   * BEFORE the comment is created. `data` is the schema-validated body
+   * (including the opaque captchaToken/captchaAnswer passthrough fields).
+   * A guard plugin (e.g. comment-captcha) sets `reject` to a Chinese message
+   * to make the API respond 422; core strips the passthrough fields before
+   * the value reaches the storage layer.
+   */
+  commentSubmission: "comment.submission",
   /** action — ({ media }) fired after an upload completes */
   mediaUploaded: "media.uploaded",
   /** action — ({ user }) fired after a successful login */
@@ -209,6 +218,24 @@ export const HOOKS = {
    * Entries may carry absolute `images` URLs (image sitemap extension).
    */
   sitemapUrls: "sitemap.urls",
+  /**
+   * async filter — ({ ...SitemapPayload, searchParams, doc }) replace the
+   * whole /sitemap.xml response. Core fills `doc` (the default urlset) only
+   * for requests with no query params; any ?… request starts with doc=null
+   * so a plugin can claim it (e.g. ?kind=news, ?part=2). A plugin may also
+   * swap the default doc for a sitemapindex when entries exceed the
+   * 50,000-url / 50MB limits. Leaving doc null makes the route respond 404
+   * (unclaimed param or out-of-range shard number).
+   */
+  sitemapDocument: "sitemap.document",
   /** filter — ({ lines, base }) mutate the generated /robots.txt lines */
   robotsRules: "robots.rules",
+  /**
+   * async filter — ({ segments, route }) let plugins claim a public URL that
+   * has no post/page/category/tag entity behind it (e.g. friend-links' /links
+   * virtual page). The first plugin that sets `route` wins; entities, the
+   * secret admin entry and the register path all take precedence over this.
+   * Payload/route shape: see lib/services/virtual-routes.ts.
+   */
+  siteRoutes: "site.routes",
 } as const;
