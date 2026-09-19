@@ -56,6 +56,11 @@ export type PostQuery = {
    * every public published listing.
    */
   pinned?: boolean;
+  /**
+   * 调用场景标记，供置顶类插件按作用域决定是否贡献置顶：
+   * "home"=首页智能推荐的近期文章区块；归档/最新文章列表不设置。
+   */
+  context?: string;
   /** Exclude one post id — used by "related posts". */
   excludeId?: number;
   /** Sort order: "date" (default), "views" most-read, "likes"/"comments" for theme ranking boards. */
@@ -228,6 +233,17 @@ async function listPostsUncached(opts: PostQuery): Promise<{
         .where(where ? and(where, inArray(posts.id, wanted)) : inArray(posts.id, wanted));
       const validSet = new Set(valid.map((r) => r.id));
       floatingIds = wanted.filter((id) => validSet.has(id));
+    }
+    // 文章编辑器里的原生「置顶」勾选（posts.pinned）此前没有任何列表消费，
+    // 勾选后前台毫无变化。这里让它同样浮动：排在插件有序 id 之后，遵守本
+    // 归档自身的分类/标签过滤；pinned:false 的调用方（订阅/RSS/排行榜）
+    // 已被外层 if 排除。
+    const pinWhere = where
+      ? and(where, eq(posts.pinned, true))
+      : eq(posts.pinned, true);
+    const nativePinned = await db.select({ id: posts.id }).from(posts).where(pinWhere);
+    for (const r of nativePinned) {
+      if (!floatingIds.includes(r.id)) floatingIds.push(r.id);
     }
   }
   const normalWhere = floatingIds.length

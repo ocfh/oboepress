@@ -208,7 +208,7 @@ export default function MediaLibrary() {
 
         <div className="mt-3 flex flex-wrap items-end gap-3">
           <div>
-            <p className="mb-1 text-sm text-zinc-300">替代文本（可选）</p>
+            <p className="mb-1 text-sm text-zinc-300">备注（作为图片替代文本，留空默认使用上传文件名）</p>
             <input
               value={alt}
               onChange={(e) => setAlt(e.target.value)}
@@ -412,7 +412,7 @@ function EditModal({
     const res = await fetch(`/api/media/${item!.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ filename, alt }),
+      body: JSON.stringify({ alt }),
     });
     setSaving(false);
     if (res.ok) {
@@ -439,15 +439,7 @@ function EditModal({
         </div>
         <div className="space-y-4">
           <label className="block text-sm text-zinc-300">
-            文件名
-            <input
-              value={filename}
-              onChange={(e) => setFilename(e.target.value)}
-              className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
-            />
-          </label>
-          <label className="block text-sm text-zinc-300">
-            替代文本
+            备注（作为图片替代文本 alt，利于 SEO 与无障碍）
             <textarea
               value={alt}
               onChange={(e) => setAlt(e.target.value)}
@@ -455,6 +447,12 @@ function EditModal({
               className="mt-1 w-full resize-none rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
             />
           </label>
+          <div className="text-xs text-zinc-500">
+            实际文件名
+            <div className="mt-1 break-all rounded-md border border-zinc-800 bg-zinc-950/60 px-3 py-2 font-mono text-zinc-400">
+              {filename}
+            </div>
+          </div>
           {item.mimeType.startsWith("image/") && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.url} alt={item.alt ?? ""} className="max-h-40 rounded-md object-contain" />

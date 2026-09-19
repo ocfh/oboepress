@@ -121,7 +121,7 @@ function createBlock(type: Block["type"]): Block {
     case "image":
       return { id, type: "image", url: "", alt: "", caption: "" };
     case "quote":
-      return { id, type: "quote", text: "", cite: "" };
+      return { id, type: "quote", text: "", cite: "", title: "" };
     case "code":
       return { id, type: "code", language: "ts", code: "" };
     case "list":
@@ -262,6 +262,12 @@ function BlockFields({
     case "quote":
       return (
         <div className="space-y-2">
+          <input
+            value={block.title ?? ""}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+            placeholder="提示标题（可选，填写后显示为灯泡提示块，如：Dovecot 关键配置项）"
+            className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500"
+          />
           <textarea
             value={block.text}
             onChange={(e) => onUpdate({ text: e.target.value })}

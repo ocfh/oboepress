@@ -409,6 +409,20 @@ export const postMetas = pgTable(
   (t) => ({ postIdx: index("post_metas_post_idx").on(t.postId) }),
 );
 
+/** 独立页面（pages 表）的自定义键值，结构与 post_metas 对齐。 */
+export const pageMetas = pgTable(
+  "page_metas",
+  {
+    id: serial("id").primaryKey(),
+    pageId: integer("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    value: text("value"),
+  },
+  (t) => ({ pageIdx: index("page_metas_page_idx").on(t.pageId) }),
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type OauthIdentity = typeof oauthIdentities.$inferSelect;

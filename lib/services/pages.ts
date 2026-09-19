@@ -9,7 +9,7 @@ import { blocksToPlainText } from "@/lib/blocks";
 import { slugify, uniqueSlug, excerptFrom } from "@/lib/utils";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { getPermalinkConfig, pageUrlFor } from "./links";
-import { getPostMetas, setPostMetas } from "./metas";
+import { getPageMetas, setPageMetas } from "./metas";
 import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type PageQuery = {
@@ -74,7 +74,7 @@ async function getPageByIdUncached(
   if (!row) throw new NotFoundError("页面不存在");
   if (!includeUnpublished && row.status !== "published")
     throw new NotFoundError("页面不存在");
-  const [metas, cfg] = await Promise.all([getPostMetas(id), getPermalinkConfig()]);
+  const [metas, cfg] = await Promise.all([getPageMetas(id), getPermalinkConfig()]);
   return { ...row, url: pageUrlFor(cfg, row), metas };
 }
 
@@ -97,7 +97,7 @@ async function getPageBySlugUncached(
   if (!includeUnpublished && row.status !== "published")
     throw new NotFoundError("页面不存在");
   const [metas, cfg] = await Promise.all([
-    getPostMetas(row.id),
+    getPageMetas(row.id),
     getPermalinkConfig(),
   ]);
   return { ...row, url: pageUrlFor(cfg, row), metas };
@@ -130,7 +130,7 @@ export async function createPage(user: SessionUser, input: PageInput): Promise<P
           : null,
     })
     .returning();
-  if (input.metas) await setPostMetas(page.id, input.metas);
+  if (input.metas) await setPageMetas(page.id, input.metas);
   bump("pages");
   bump("widgets");
   return getPageById(page.id, true);
@@ -187,7 +187,7 @@ export async function updatePage(
     })
     .where(eq(pages.id, id));
 
-  if (input.metas) await setPostMetas(id, input.metas);
+  if (input.metas) await setPageMetas(id, input.metas);
   bump("pages");
   bump("widgets");
   return getPageById(id, true);

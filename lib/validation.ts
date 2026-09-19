@@ -22,6 +22,8 @@ export const blockSchema = z.union([
     type: z.literal("quote"),
     text: z.string(),
     cite: z.string().optional(),
+    // 可选提示标题：填写后前端渲染为 nv-tip 风格的灯泡提示块
+    title: z.string().optional(),
   }),
   z.object({
     id: z.string(),

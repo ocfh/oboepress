@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -28,6 +29,7 @@ import {
   ScrollText,
   Download,
   DatabaseBackup,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
@@ -73,6 +75,11 @@ export default function AdminShell({
   pluginNav?: AdminMenuItem[];
 }) {
   const pathname = usePathname();
+  // 移动端侧栏抽屉：≤lg 屏宽时侧栏收起为左滑抽屉 + 遮罩，避免把业务区挤死
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   // 登录与初始化页不套后台壳，直接原样渲染（绕过未登录重定向，避免 307 自跳死循环）
   if (STANDALONE.includes(pathname)) {
@@ -115,16 +122,52 @@ export default function AdminShell({
       : pathname === item.href || pathname.startsWith(item.href + "/");
 
   return (
-    <div className="flex min-h-screen">
-      <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4">
+    <div className="min-h-screen">
+      {/* 移动端顶栏：汉堡 + 标题（lg 以上侧栏常驻，此栏隐藏） */}
+      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-zinc-800 bg-zinc-900 px-4 lg:hidden">
+        <button
+          type="button"
+          aria-label="打开菜单"
+          onClick={() => setNavOpen(true)}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+        >
+          <MenuIcon size={20} />
+        </button>
+        <span className="text-base font-bold text-indigo-400">OboePress 管理后台</span>
+      </div>
+
+      {/* 移动端抽屉遮罩：点击收起 */}
+      {navOpen && (
+        <div
+          aria-hidden="true"
+          onClick={() => setNavOpen(false)}
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+        />
+      )}
+
+      <div className="flex">
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-60 shrink-0 flex-col overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 transition-transform duration-200 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0 ${
+          navOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="mb-6 flex items-center gap-2 px-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <LayoutDashboard size={20} />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-lg font-bold leading-tight text-indigo-400">OboePress</p>
             <p className="text-xs text-zinc-500">管理后台</p>
           </div>
+          {/* 抽屉内关闭钮（lg 以上侧栏常驻，隐藏） */}
+          <button
+            type="button"
+            aria-label="关闭菜单"
+            onClick={() => setNavOpen(false)}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md text-zinc-400 transition hover:bg-zinc-800 hover:text-white lg:hidden"
+          >
+            <X size={18} />
+          </button>
         </div>
         <nav className="space-y-1">
           {visibleNav.map((item) => {
@@ -192,7 +235,8 @@ export default function AdminShell({
           <LogoutButton />
         </div>
       </aside>
-      <main className="flex-1 overflow-x-hidden p-8">{children}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">{children}</main>
+      </div>
     </div>
   );
 }

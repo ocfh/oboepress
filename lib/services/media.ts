@@ -37,6 +37,8 @@ export async function createMediaFromFile(
   // 落盘名本身是「时间戳-随机」格式（见 storage.ts）；入库的 filename 也存
   // 这座文件名而非原始文件名，保证媒体库展示与实际存储对象一致。
   const storedName = result.url.split("?")[0].split("/").pop() || file.name;
+  // 备注（即图片 alt 文本）：用户未填写时默认记录上传时的原始文件名。
+  const note = alt.trim() || file.name;
   const [row] = await db
     .insert(media)
     .values({
@@ -44,7 +46,7 @@ export async function createMediaFromFile(
       url: result.url,
       mimeType: result.contentType,
       size: result.size,
-      alt,
+      alt: note,
       uploadedById: user.id,
     })
     .returning();

@@ -63,6 +63,8 @@ export interface ThemeManifest {
  */
 export interface ThemeEditorField {
   metaKey: string;
+  /** 字段出现在哪种内容类型的编辑器；默认仅文章。 */
+  target?: "post" | "page" | "both";
   Component: React.ComponentType<{
     value: string | null;
     onChange: (hex: string | null) => void;
@@ -202,27 +204,37 @@ export function getThemeTemplates(
 }
 
 /**
- * 内置主题的显式加载表。
+ * 主题代码加载表——构建期自动发现，无需手工登记。
  *
- * 不能图省事写成 `import(`@/themes/${slug}/index`)`：全动态模板会让 webpack
- * 生成一个囊括所有主题目录的 context 单块，把六个主题的导航/轮播/分享等客户端
- * 代码合并进同一个 chunk。前台 SSR 只要渲染任意一个主题（bluemix），访客就会
- * 把 skyscraper/codeman 等其余主题的代码一并下载（实测 57.6KB 的主题块里约
- * 一半是别主题的白下发）。显式映射让每个主题各自成块，仅当前启用主题会被
- * 加载；真正共用的工具仍由 splitChunks 自动提取为小公共块。
+ * require.context 在构建时扫描 themes/ 目录：凡是 `<slug>/index.ts(x)` 的文件夹
+ * 都被识别为主题并各自打成独立异步 chunk（第四参 "lazy"），运行时按 slug 取块。
+ * 用户/开发者把新主题文件夹放进 themes/ 后重新构建，后台与前台即自动识别，
+ * 与插件目录 lib/plugins/loader.ts 的动态 import 机制一致，不再需要改本文件。
  *
- * 键用 manifest.slug（运行时实际传入值）。scottstudio-thyuu（历史目录名
- * oboepress-2032）已随主题瘦身移除，不再保留映射。
+ * 不能写成全动态 `import(`@/themes/${slug}/index`)`：那种模板会生成 sync/eager
+ * 风格的单一 context 块，把所有主题的客户端代码合进同一个 chunk 白下发（实测
+ * 57.6KB）。require.context + "lazy" 让每个目录独立成块，仅当前启用主题被加载；
+ * 共用工具仍由 splitChunks 自动提取为小公共块。
+ *
+ * 生产构建后新增的目录（如后台「新建主题」复制出的源码）既不在 context 内也无
+ * 编译产物，需随源码重新构建——这是独立 Next 生产包的固有限制，插件同理。
  */
-// 模块值保持 any：与原全动态 import 的推导结果一致，各主题 index 还允许导出
-// manifest.settingsSchema 的兼容形态（{ sections: [...] }），不在这里做严格收窄。
-const THEME_LOADERS: Record<string, () => Promise<any>> = {
-  bluemix: () => import("@/themes/bluemix"),
-  codeman: () => import("@/themes/codeman"),
-  default: () => import("@/themes/default"),
-  pseudolinear: () => import("@/themes/pseudolinear"),
-  skyscraper: () => import("@/themes/skyscraper"),
+// require.context 的类型不在常规 @types 内，局部收敛为最小可用签名。
+type LazyThemeContext = {
+  keys(): string[];
+  (id: string): Promise<any>;
 };
+const themeContext = (
+  require as unknown as {
+    context: (dir: string, recursive: boolean, regExp: RegExp, mode: "lazy") => LazyThemeContext;
+  }
+).context("@/themes", true, /^\.\/[^/]+\/index\.tsx?$/, "lazy");
+
+const THEME_LOADERS: Record<string, () => Promise<any>> = {};
+for (const key of themeContext.keys()) {
+  const slug = key.match(/^\.\/([^/]+)\/index\.tsx?$/)?.[1];
+  if (slug) THEME_LOADERS[slug] = () => themeContext(key);
+}
 
 /**
  * Dynamically import a theme module by slug.
@@ -230,13 +242,8 @@ const THEME_LOADERS: Record<string, () => Promise<any>> = {
  */
 export async function loadThemeModule(slug: string): Promise<ThemeModule | null> {
   try {
-    // 只允许显式映射表内的主题。这里绝不能再留 `import(`@/themes/${slug}/index`)`
-    // 形式的兜底：只要同文件存在全动态模板，webpack 就会生成覆盖整个 themes/
-    // 目录的 context 模块，六个主题的客户端代码被合进同一个 chunk，上面的显式
-    // 映射会被完全抵消（实测 chunk 哈希一字节不变）。
-    // 后台「新建主题」只是把内置模板复制成 .tsx 源文件；生产构建后新目录既不在
-    // webpack context 内也没有编译产物，即便保留动态 import 在生产环境同样加载
-    // 失败。自定义主题需要随源码一起构建，届时在此表补一行即可。
+    // 加载器由 require.context 自动登记；同时要求目录里存在 manifest.json
+    // （getThemeManifest 走文件系统扫描），两道识别都通过才认为是合法主题。
     const loader = THEME_LOADERS[slug];
     if (!loader) return null;
     const mod = await loader();

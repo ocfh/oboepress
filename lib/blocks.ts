@@ -8,7 +8,7 @@ export type Block =
   | { id: string; type: "heading"; level: 1 | 2 | 3 | 4; text: string }
   | { id: string; type: "paragraph"; text: string }
   | { id: string; type: "image"; url: string; alt?: string; caption?: string }
-  | { id: string; type: "quote"; text: string; cite?: string }
+  | { id: string; type: "quote"; text: string; cite?: string; title?: string }
   | { id: string; type: "code"; language?: string; code: string }
   | { id: string; type: "list"; ordered?: boolean; items: string[] }
   | { id: string; type: "divider" }
@@ -54,13 +54,21 @@ function renderBlock(block: Block): string {
         : "";
       return `<figure class="cms-figure">${img}${caption}</figure>`;
     }
-    case "quote":
-      return `<blockquote><p>${escapeHtml(block.text).replace(
+    case "quote": {
+      // 有标题时输出提示块（对齐参考站 nv-tip：浅蓝卡片 + 灯泡 + 主色标题），
+      // 灯泡为内联 SVG，正文 HTML 由 dangerouslySetInnerHTML 输出，无需图标运行时。
+      const tipIcon =
+        '<svg class="bmx-quote-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.6.6 1 1.5 1 2.5h6c0-1 .4-1.9 1-2.5A6 6 0 0 0 12 3Z"/></svg>';
+      const titleHead = block.title
+        ? `<div class="bmx-quote-title">${tipIcon}<span>${escapeHtml(block.title)}</span></div>`
+        : "";
+      return `<blockquote class="bmx-quote${block.title ? " bmx-tip" : ""}">${titleHead}<p>${escapeHtml(block.text).replace(
         /\n/g,
         "<br/>",
       )}</p>${
         block.cite ? `<cite>— ${escapeHtml(block.cite)}</cite>` : ""
       }</blockquote>`;
+    }
     case "code":
       return `<pre data-lang="${escapeHtml(
         block.language || "text",

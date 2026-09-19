@@ -255,26 +255,35 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
   background:transparent; color:var(--muted); transition:color .15s ease;
 }
 .comment-form .funcs>button:hover{ color:var(--accent); }
+/* 游客三输入框对齐参考站 Twikoo：13px/34px 高，左侧图标前缀与输入框连体
+   （前缀左圆角、输入框右圆角），聚焦时主色描边 + 柔光 */
 .comment-form .guest-info{ display:flex; gap:8px; }
 .comment-form .guest-info .item{ position:relative; flex:1 1 0; min-width:0; }
 .comment-form .comment-field{
-  width:100%; height:40px; padding:0 12px 0 36px;
-  font-size:15px; font-family:inherit; outline:none;
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius); color:var(--text);
+  width:100%; height:34px; padding:0 10px 0 34px;
+  font-size:13px; font-family:inherit; outline:none;
+  background:var(--surface, #fff);
+  border:1px solid var(--border, rgba(144,147,153,.35)); border-left:0;
+  border-radius:0 8px 8px 0; color:var(--text, #1f2937);
+  box-shadow:inset 0 1px 2px rgba(31,45,61,.05);
   transition:border-color .15s ease, box-shadow .15s ease;
 }
 .comment-form .comment-field:focus{
   border-color:var(--accent);
-  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent), inset 0 1px 2px rgba(31,45,61,.05);
 }
 .comment-form .comment-field::placeholder{ color:var(--muted); }
 .comment-form .guest-info .item i{
-  position:absolute; left:0; top:0; bottom:0; width:36px;
+  position:absolute; left:0; top:0; bottom:0; width:34px;
   display:flex; align-items:center; justify-content:center;
   font-style:normal; pointer-events:none; color:var(--muted);
+  background:color-mix(in srgb, var(--muted, #909399) 8%, var(--surface, #fff));
+  border:1px solid var(--border, rgba(144,147,153,.35)); border-right:0;
+  border-radius:8px 0 0 8px;
 }
-.comment-form .comment-field:focus + i{ color:var(--accent); }
+.comment-form .comment-field:focus + i{
+  color:var(--accent); border-color:var(--accent);
+}
 @media (max-width:650.5px){
   .comment-form .guest-info{ flex-direction:column; }
 }
@@ -309,37 +318,26 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
 .sf-comment-me-name{ font-size:14px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sf-comment-me-email{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-/* Emoji picker — verbatim visual port of the reference site: the root doubles
-   as the reference pf-popover glass box; inner rules are copied 1:1 from the
-   reference stylesheet (.emoji-grid stands in for its .grid.cols-7 utility).
-   bluemix provides every --primary/--white/--gray opacity var; fallbacks keep
-   the shared component legible in other themes. */
+/* Emoji picker — 默认主题基线：中性描边弹层，向触发钮【上方】展开（下方展开
+   会把整页撑出屏幕）。玻璃拟态是 bluemix 的主题风格，由 bluemix.css 用
+   .th-bluemix 高优先级选择器覆盖，不写进共享基线。 */
 .comment-form .funcs button.is-active{ color:var(--accent); }
 .emoji-panel{
-  position:absolute; left:0; top:calc(100% + 6px); z-index:30;
-  padding:1em; font-size:15px; border-radius:8px;
-  background:
-    linear-gradient(rgba(255,255,255,.53) 12px,rgba(255,255,255,.8)),
-    linear-gradient(-90deg,transparent,var(--primary-opacity-2, color-mix(in srgb, var(--accent) 20%, transparent)));
-  box-shadow:0 0 0 1px var(--white-default,#fff) inset,0 0 1px var(--gray-opacity-1,rgba(0,0,0,.1)),0 8px 20px var(--gray-opacity-25,rgba(0,0,0,.25));
-  -webkit-backdrop-filter:blur(5px) brightness(100%) saturate(200%);
-  backdrop-filter:blur(5px) brightness(85%) saturate(200%);
-  text-shadow:-1px -1px var(--white-opacity-7,rgba(255,255,255,.7)),2px 2px 2px var(--primary-gray-opacity-3,rgba(120,120,120,.3));
+  position:absolute; left:0; bottom:calc(100% + 6px); z-index:30;
+  padding:1em; font-size:15px; border-radius:10px;
+  background:var(--surface, #fff);
+  border:1px solid var(--border, rgba(0,0,0,.12));
+  box-shadow:0 10px 28px rgba(0,0,0,.18);
 }
-.emoji-panel:before{
-  content:""; position:absolute; left:.25em; top:1px; right:.25em; height:10px;
-  border-radius:9em; background:linear-gradient(#fff,rgba(255,255,255,.3));
-  box-shadow:0 1px #ffffff4d inset; z-index:-1;
-}
+.emoji-panel:before{ content:none; }
 .emoji-panel .panel{
-  width:290px; height:300px; margin:-4px -10px 0;
+  width:290px; height:300px; margin:0 -10px;
   overflow-y:auto; scroll-behavior:smooth; position:relative;
 }
 .emoji-panel .emoji-grid{ display:grid; grid-template-columns:repeat(7,1fr); }
 .emoji-panel .tabs{
   display:flex;
-  border-top:1px solid var(--white-default,#fff);
-  box-shadow:0 -1px 0 var(--primary-gray-opacity-2,rgba(120,120,120,.2));
+  border-top:1px solid var(--border, rgba(0,0,0,.1));
   margin:1px -14px -14px;
 }
 .emoji-panel .tabs button{
@@ -358,12 +356,11 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
 }
 .emoji-panel .tabs button:hover{ opacity:1; filter:none; }
 .emoji-panel .title{
-  padding:5px 10px; color:var(--primary-color,var(--accent));
-  text-shadow:1.5px 1.5px 1.5px var(--primary-opacity-4,color-mix(in srgb,var(--accent) 40%,transparent)),-1px -1px var(--white-opacity-7,rgba(255,255,255,.7));
-  font-size:16px; background:#c7e1fdf4;
-  border:1px solid var(--primary-opacity-2,color-mix(in srgb,var(--accent) 20%,transparent));
-  margin:6px; border-radius:.35em; position:sticky; top:0;
-  box-shadow:0 1px var(--white-opacity-3,rgba(255,255,255,.3)) inset;
+  padding:3px 10px; color:var(--muted, #666);
+  font-size:12px; font-weight:600;
+  background:color-mix(in srgb, var(--muted, #888) 8%, var(--surface, #fff));
+  border-radius:6px;
+  margin:6px; position:sticky; top:0;
 }
 .emoji-panel .emoji{
   height:42px; border:none; padding:0; font-size:22px; line-height:1;

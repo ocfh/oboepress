@@ -451,8 +451,13 @@ export default function ContentEditor({
               className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm outline-none focus:border-indigo-500"
             />
 
-            {kind === "post" &&
-              Object.entries(editorFields).map(([key, field]) => {
+            {Object.entries(editorFields)
+              // 字段按 target 决定出现在文章编辑器还是页面编辑器（默认仅文章）
+              .filter(([, field]) => {
+                const t = field.target ?? "post";
+                return t === "both" || t === kind;
+              })
+              .map(([key, field]) => {
                 const Mod = field.Component;
                 return (
                   <div className="mt-3" key={key}>

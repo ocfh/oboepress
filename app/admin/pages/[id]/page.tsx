@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { getPageById } from "@/lib/services/pages";
+import { getActiveTheme } from "@/lib/services/themes";
+import { collectEditorFields } from "@/lib/editor-fields";
 import ContentEditor from "@/components/ContentEditor";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +17,9 @@ export default async function EditPage({
   } catch {
     notFound();
   }
+
+  const activeTheme = await getActiveTheme();
+  const editorFields = await collectEditorFields(activeTheme.slug);
 
   return (
     <ContentEditor
@@ -37,6 +42,7 @@ export default async function EditPage({
       }}
       categories={[]}
       tags={[]}
+      editorFields={editorFields}
     />
   );
 }

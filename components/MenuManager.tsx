@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   Menu as MenuIcon,
   Save,
@@ -8,6 +8,7 @@ import {
   ArrowUp,
   ArrowDown,
   CornerDownRight,
+  CornerUpLeft,
   Trash2,
 } from "lucide-react";
 import IconPicker from "./admin/IconPicker";
@@ -19,6 +20,7 @@ type Node = {
   type: string;
   target: string;
   icon: string | null;
+  referenceSlug?: string | null;
   children: Node[];
 };
 
@@ -47,7 +49,9 @@ function flatten(nodes: Node[], depth = 0): FlatItem[] {
       type: n.type,
       label: n.label,
       url: n.url,
-      referenceSlug: null,
+      // 必须保留服务端返回的引用键；编辑保存时后端靠它实时解析链接，
+      // 置空会让所有引用型菜单项退回易腐烂的 url 快照。
+      referenceSlug: n.referenceSlug ?? null,
       target: n.target,
       icon: n.icon ?? null,
       depth,
@@ -63,7 +67,9 @@ export default function MenuManager() {
   const [flat, setFlat] = useState<FlatItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
-  const [options, setOptions] = useState<Record<string, { id: number; label: string; url: string }[]>>({});
+  const [options, setOptions] = useState<Record<string, { id: number; label: string; slug: string; url: string }[]>>({});
+  // 未持久化新项的客户端临时 id（负数）；后端识别负数并映射到真实 id。
+  const tempSeq = useRef(0);
 
   const load = useCallback(async () => {
     const res = await fetch("/api/menus");
@@ -91,29 +97,39 @@ export default function MenuManager() {
     else return;
     const res = await fetch(url);
     const data = await res.json();
-    let list: { id: number; label: string; url: string }[] = [];
+    let list: { id: number; label: string; slug: string; url: string }[] = [];
     if (type === "post" || type === "page") {
       list = (data.items ?? []).map((p: any) => ({
         id: p.id,
         label: p.title,
+        slug: p.slug,
         url: p.url,
       }));
     } else {
       list = (data ?? []).map((t: any) => ({
         id: t.id,
         label: t.name,
+        slug: t.slug,
         url: t.url,
       }));
     }
     setOptions((o) => ({ ...o, [type]: list }));
   }
 
+  // 打开菜单即预载本单用到的引用类型选项，保证 select 能回显已选目标。
+  useEffect(() => {
+    const types = Array.from(new Set(flat.map((it) => it.type).filter((t) => t !== "custom")));
+    types.forEach((t) => ensureOptions(t));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flat.length, activeId]);
+
   function update(idx: number, patch: Partial<FlatItem>) {
     setFlat((f) => f.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
   }
 
   function addItem() {
-    setFlat((f) => [...f, { parentId: null, order: f.length, type: "custom", label: "", url: "", referenceSlug: null, target: "_self", icon: null, depth: 0 }]);
+    const id = --tempSeq.current;
+    setFlat((f) => [...f, { id, parentId: null, order: f.length, type: "custom", label: "", url: "", referenceSlug: null, target: "_self", icon: null, depth: 0 }]);
   }
 
   function removeItem(idx: number) {
@@ -210,7 +226,8 @@ export default function MenuManager() {
               value={it.type}
               onChange={(e) => {
                 const t = e.target.value;
-                update(idx, { type: t });
+                // 切换类型后旧引用必然失效：清掉引用键与快照 url，避免串台
+                update(idx, { type: t, referenceSlug: null, url: "" });
                 ensureOptions(t);
               }}
               className="rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
@@ -224,19 +241,23 @@ export default function MenuManager() {
 
             {it.type !== "custom" && (
               <select
-                value={it.url}
+                value={it.referenceSlug ?? ""}
                 onChange={(e) => {
-                  // 选中目标后填入链接与默认文字；旁边的显示文字输入框仍可自由修改，
-                  // select 以 url 作为选中依据，自定义文字后也不会跳回空选项。
-                  const url = e.target.value;
-                  const matched = (options[it.type] ?? []).find((o) => o.url === url);
-                  update(idx, { url, label: matched?.label ?? it.label });
+                  // select 以稳定的 slug 作为选中依据（与固定链接模式无关）；
+                  // url 只存一份快照用于兜底，前台读时会按当前固定链接实时解析。
+                  const slug = e.target.value;
+                  const matched = (options[it.type] ?? []).find((o) => o.slug === slug);
+                  update(idx, {
+                    referenceSlug: slug || null,
+                    url: matched?.url ?? "",
+                    label: matched?.label ?? it.label,
+                  });
                 }}
                 className="w-52 rounded border border-zinc-700 bg-zinc-950 px-2 py-1 text-sm"
               >
                 <option value="">选择{it.type === "post" ? "文章" : it.type === "page" ? "页面" : it.type === "category" ? "分类" : "标签"}…</option>
                 {(options[it.type] ?? []).map((o) => (
-                  <option key={o.id} value={o.url}>
+                  <option key={o.id} value={o.slug}>
                     {o.label}
                   </option>
                 ))}
@@ -260,7 +281,7 @@ export default function MenuManager() {
             )}
             {it.type !== "custom" && (
               <span className="max-w-56 truncate font-mono text-xs text-zinc-500" title={it.url}>
-                {it.url || "未选择"}
+                {it.referenceSlug ? it.url || "已选择" : "未选择"}
               </span>
             )}
 
@@ -284,12 +305,27 @@ export default function MenuManager() {
                 <ArrowDown size={14} />
               </button>
               <button
-                onClick={() => update(idx, { parentId: flat[idx]?.id ?? null, depth: it.depth + 1 })}
+                onClick={() => {
+                  // 挂到「上一项」下（用上一项的真实/临时 id），深度跟随上一项。
+                  const prev = flat[idx - 1];
+                  if (!prev || prev.id === undefined) return;
+                  update(idx, { parentId: prev.id, depth: Math.min(prev.depth + 1, 2) });
+                }}
+                disabled={idx === 0}
                 title="作为上一项的子项"
-                className="rounded bg-zinc-800 p-1.5 text-zinc-300 hover:bg-zinc-700"
+                className="rounded bg-zinc-800 p-1.5 text-zinc-300 hover:bg-zinc-700 disabled:opacity-30"
               >
                 <CornerDownRight size={14} />
               </button>
+              {it.depth > 0 && (
+                <button
+                  onClick={() => update(idx, { parentId: null, depth: 0 })}
+                  title="升回顶级"
+                  className="rounded bg-zinc-800 p-1.5 text-zinc-300 hover:bg-zinc-700"
+                >
+                  <CornerUpLeft size={14} />
+                </button>
+              )}
               <button
                 onClick={() => removeItem(idx)}
                 title="删除"
