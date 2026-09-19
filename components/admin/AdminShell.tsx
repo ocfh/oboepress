@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -29,39 +29,54 @@ import {
   ScrollText,
   Download,
   DatabaseBackup,
+  ChevronDown,
   X,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
-import { ADMIN_ICONS, type AdminMenuItem } from "@/lib/admin-extensions";
+import {
+  ADMIN_ICONS,
+  type AdminMenuItem,
+  type AdminMenuSection,
+} from "@/lib/admin-extensions";
 
-const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adminOnly?: boolean; superOnly?: boolean }[] = [
-  { href: "/admin", label: "仪表盘", exact: true, icon: LayoutDashboard },
-  { href: "/admin/posts", label: "文章", icon: FileText },
-  { href: "/admin/pages", label: "页面", icon: Files },
-  { href: "/admin/media", label: "媒体库", icon: Images },
-  { href: "/admin/categories", label: "分类", icon: Folder },
-  { href: "/admin/tags", label: "标签", icon: Tags },
-  { href: "/admin/icons", label: "图标库", icon: Shapes },
-  { href: "/admin/comments", label: "评论", icon: MessageSquare, adminOnly: true },
-  { href: "/admin/themes", label: "主题", icon: Palette },
-  { href: "/admin/widgets", label: "小工具", icon: LayoutGrid, superOnly: true },
-  { href: "/admin/menus", label: "菜单", icon: MenuIcon, superOnly: true },
-  { href: "/admin/plugins", label: "插件", icon: Plug, superOnly: true },
-  { href: "/admin/settings", label: "设置", icon: Settings, superOnly: true },
-  { href: "/admin/permalinks", label: "固定链接", icon: Link2, superOnly: true },
-  { href: "/admin/security", label: "后台安全", icon: ShieldCheck, superOnly: true },
-  { href: "/admin/maintenance", label: "维护模式", icon: Construction, superOnly: true },
-  { href: "/admin/notfound", label: "404 页面", icon: FileQuestion, superOnly: true },
-  { href: "/admin/security-logs", label: "安全日志", icon: ScrollText, superOnly: true },
-  { href: "/admin/members", label: "会员注册", icon: UserPlus, superOnly: true },
-  { href: "/admin/oauth", label: "第三方登录", icon: Share2, superOnly: true },
-  { href: "/admin/notify", label: "通知验证码", icon: Bell, superOnly: true },
-  { href: "/admin/users", label: "用户", icon: Users, superOnly: true },
-  { href: "/admin/export", label: "内容导出", icon: Download, superOnly: true },
-  { href: "/admin/backup", label: "备份与恢复", icon: DatabaseBackup, superOnly: true },
-];
+type Leaf = {
+  href: string;
+  label: string;
+  icon?: LucideIcon;
+  /** 钩子注入的图标名（与 ADMIN_ICONS 映射） */
+  iconName?: string;
+  exact?: boolean;
+  external?: boolean;
+  adminOnly?: boolean;
+  superOnly?: boolean;
+};
+
+type Group = {
+  id: string;
+  label: string;
+  icon?: LucideIcon;
+  /** 插件/主题一级菜单只能传图标名，渲染时映射 ADMIN_ICONS */
+  iconName?: string;
+  adminOnly?: boolean;
+  superOnly?: boolean;
+  children: Leaf[];
+};
+
+/** 钩子/清单二级项转侧栏叶子；http(s) 链接自动按外链渲染。 */
+function toLeaf(item: AdminMenuItem): Leaf {
+  return {
+    href: item.href,
+    label: item.label,
+    iconName: item.icon,
+    exact: item.exact,
+    external: item.external ?? /^https?:\/\//i.test(item.href),
+    adminOnly: item.adminOnly,
+    superOnly: item.superOnly,
+  };
+}
 
 const STANDALONE = ["/admin/login", "/admin/setup"];
 
@@ -69,17 +84,28 @@ export default function AdminShell({
   user,
   children,
   pluginNav = [],
+  pluginPanels = [],
+  pluginSections = [],
+  themeSection = null,
+  activeThemeSlug = "",
 }: {
   user: SessionUser | null;
   children: React.ReactNode;
   pluginNav?: AdminMenuItem[];
+  /** 已启用且自带管理面板的插件（服务端收集，直达 /admin/plugins/[slug]） */
+  pluginPanels?: { slug: string; name: string }[];
+  /** 插件经 admin.menu 钩子注册的一级菜单 */
+  pluginSections?: AdminMenuSection[];
+  /** 当前主题在 manifest.json 声明的一级菜单（打样） */
+  themeSection?: AdminMenuSection | null;
+  /** 当前启用主题 slug，用于「外观 → 主题设置」直达兜底 */
+  activeThemeSlug?: string;
 }) {
   const pathname = usePathname();
   // 移动端侧栏抽屉：≤lg 屏宽时侧栏收起为左滑抽屉 + 遮罩，避免把业务区挤死
   const [navOpen, setNavOpen] = useState(false);
-  useEffect(() => {
-    setNavOpen(false);
-  }, [pathname]);
+  // 手风琴显式开合状态；未操作过的分组默认展开「含当前路由」的那一组
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   // 登录与初始化页不套后台壳，直接原样渲染（绕过未登录重定向，避免 307 自跳死循环）
   if (STANDALONE.includes(pathname)) {
@@ -104,22 +130,113 @@ export default function AdminShell({
     );
   }
 
-  const visibleNav = NAV.filter((item) => {
-    if (item.superOnly) return user.role === "admin";
-    if (item.adminOnly) return user.role === "admin" || user.role === "editor";
+  const can = (leaf: { adminOnly?: boolean; superOnly?: boolean }) => {
+    if (leaf.superOnly) return user.role === "admin";
+    if (leaf.adminOnly) return user.role === "admin" || user.role === "editor";
     return true;
+  };
+
+  const isActive = (leaf: { href: string; exact?: boolean }) =>
+    leaf.exact
+      ? pathname === leaf.href
+      : pathname === leaf.href || pathname.startsWith(leaf.href + "/");
+
+  // 全侧栏共享的 href 去重集合：面板直达、扩展组钩子项、插件/主题一级菜单
+  // 里的二级项都过同一道，任何链接只出现一次。
+  const panelHrefs = new Set(pluginPanels.map((p) => `/admin/plugins/${p.slug}`));
+  const seen = new Set<string>();
+  const dedupe = (item: AdminMenuItem): Leaf | null => {
+    if (panelHrefs.has(item.href) || seen.has(item.href)) return null;
+    seen.add(item.href);
+    return toLeaf(item);
+  };
+  const sectionToGroup = (s: AdminMenuSection): Group => ({
+    id: `sec:${s.section}`,
+    label: s.label,
+    iconName: s.icon,
+    adminOnly: s.adminOnly,
+    superOnly: s.superOnly,
+    children: s.items.map(dedupe).filter((l): l is Leaf => l !== null),
   });
 
-  const visiblePluginNav = pluginNav.filter((item) => {
-    if (item.superOnly) return user.role === "admin";
-    if (item.adminOnly) return user.role === "admin" || user.role === "editor";
-    return true;
-  });
+  const themeGroup = themeSection ? sectionToGroup(themeSection) : null;
+  // 主题已自带一级菜单时，外观组里不再重复挂「主题设置」。
+  const pluginSectionGroups = pluginSections.map(sectionToGroup);
 
-  const isActive = (item: (typeof NAV)[number]) =>
-    item.exact
-      ? pathname === item.href
-      : pathname === item.href || pathname.startsWith(item.href + "/");
+  const groups: Group[] = [
+    {
+      id: "content",
+      label: "内容",
+      icon: FileText,
+      children: [
+        { href: "/admin/posts", label: "文章", icon: FileText },
+        { href: "/admin/pages", label: "页面", icon: Files },
+        { href: "/admin/categories", label: "分类", icon: Folder },
+        { href: "/admin/tags", label: "标签", icon: Tags },
+        { href: "/admin/comments", label: "评论", icon: MessageSquare, adminOnly: true },
+        { href: "/admin/media", label: "媒体库", icon: Images },
+        { href: "/admin/icons", label: "图标库", icon: Shapes },
+      ],
+    },
+    {
+      id: "appearance",
+      label: "外观",
+      icon: Palette,
+      children: [
+        // 直达当前主题设置页（参考 WordPress「外观 → 主题文件/自定义」）；
+        // 主题已声明自己的一级菜单时该入口交给主题组，这里不重复。
+        ...(activeThemeSlug && !themeGroup
+          ? [{ href: `/admin/themes/${activeThemeSlug}`, label: "主题设置", icon: Palette }]
+          : []),
+        { href: "/admin/themes", label: "全部主题", icon: Palette, exact: true },
+        { href: "/admin/widgets", label: "小工具", icon: LayoutGrid, superOnly: true },
+        { href: "/admin/menus", label: "菜单", icon: MenuIcon, superOnly: true },
+      ],
+    },
+    // 主题一级菜单（打样位，紧跟外观组）
+    ...(themeGroup ? [themeGroup] : []),
+    {
+      id: "plugins",
+      label: "扩展",
+      icon: Plug,
+      superOnly: true,
+      children: [
+        // 直达每个启用插件自带的管理面板
+        ...pluginPanels.map<Leaf>((p) => ({
+          href: `/admin/plugins/${p.slug}`,
+          label: p.name,
+        })),
+        // 插件自身经 admin.menu 钩子注入的入口；面板已直达、或侧栏别处已有
+        // （如插件自建一级菜单）的同 href 项一律去重。
+        ...pluginNav.map(dedupe).filter((l): l is Leaf => l !== null),
+        { href: "/admin/plugins", label: "全部插件", icon: Plug, exact: true },
+      ],
+    },
+    // 插件自建一级菜单（愿意提升的插件才出现，不强制）
+    ...pluginSectionGroups,
+    {
+      id: "system",
+      label: "系统",
+      icon: Settings,
+      superOnly: true,
+      children: [
+        { href: "/admin/settings", label: "站点设置", icon: Settings },
+        { href: "/admin/permalinks", label: "固定链接", icon: Link2 },
+        { href: "/admin/security", label: "后台安全", icon: ShieldCheck },
+        { href: "/admin/maintenance", label: "维护模式", icon: Construction },
+        { href: "/admin/notfound", label: "404 页面", icon: FileQuestion },
+        { href: "/admin/security-logs", label: "安全日志", icon: ScrollText },
+        { href: "/admin/members", label: "会员注册", icon: UserPlus },
+        { href: "/admin/oauth", label: "第三方登录", icon: Share2 },
+        { href: "/admin/notify", label: "通知验证码", icon: Bell },
+        { href: "/admin/users", label: "用户", icon: Users },
+        { href: "/admin/export", label: "内容导出", icon: Download },
+        { href: "/admin/backup", label: "备份与恢复", icon: DatabaseBackup },
+      ],
+    },
+  ];
+
+  const dashboardActive = pathname === "/admin";
 
   return (
     <div className="min-h-screen">
@@ -169,51 +286,99 @@ export default function AdminShell({
             <X size={18} />
           </button>
         </div>
-        <nav className="space-y-1">
-          {visibleNav.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item);
+        <nav className="space-y-0.5">
+          {/* 仪表盘：独立顶级入口 */}
+          <Link
+            href="/admin"
+            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition hover:bg-zinc-800 hover:text-white ${
+              dashboardActive ? "bg-zinc-800 text-white" : "text-zinc-300"
+            }`}
+          >
+            <LayoutDashboard size={18} className={dashboardActive ? "text-indigo-400" : ""} />
+            仪表盘
+          </Link>
+
+          {groups.map((group) => {
+            if (!can(group)) return null;
+            const leaves = group.children.filter(can);
+            if (leaves.length === 0) return null;
+            const groupActive = leaves.some(isActive);
+            // 未显式操作时，包含当前路由的分组默认展开
+            const open = openMap[group.id] ?? groupActive;
+            // 核心组直接持有图标组件；插件/主题组只给了图标名，走名称映射，
+            // 未登记的名字回退为通用插头图标。
+            const GroupIcon =
+              group.icon ||
+              (group.iconName ? ADMIN_ICONS[group.iconName.toLowerCase()] : undefined) ||
+              Plug;
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition hover:bg-zinc-800 hover:text-white ${
-                  active ? "bg-zinc-800 text-white" : "text-zinc-300"
-                }`}
-              >
-                <Icon size={18} className={active ? "text-indigo-400" : ""} />
-                {item.label}
-              </Link>
+              <div key={group.id}>
+                <button
+                  type="button"
+                  onClick={() => setOpenMap((m) => ({ ...m, [group.id]: !open }))}
+                  aria-expanded={open}
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition hover:bg-zinc-800/60 hover:text-zinc-200 ${
+                    groupActive ? "text-zinc-300" : "text-zinc-500"
+                  }`}
+                >
+                  <GroupIcon size={15} className={groupActive ? "text-indigo-400" : ""} />
+                  {group.label}
+                  <ChevronDown
+                    size={14}
+                    className={`ml-auto transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+                  />
+                </button>
+                {open && (
+                  <div className="mt-0.5 space-y-0.5 pb-1">
+                    {leaves.map((leaf) => {
+                      const active = isActive(leaf);
+                      const Icon =
+                        leaf.icon ||
+                        (leaf.iconName
+                          ? ADMIN_ICONS[leaf.iconName.toLowerCase()]
+                          : undefined);
+                      const inner = (
+                        <>
+                          {Icon ? (
+                            <Icon size={15} className={active ? "text-indigo-400" : ""} />
+                          ) : (
+                            <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-current opacity-60" />
+                          )}
+                          <span className="truncate">{leaf.label}</span>
+                          {leaf.external && (
+                            <ExternalLink
+                              size={11}
+                              className="ml-auto shrink-0 opacity-60"
+                              aria-label="外部链接"
+                            />
+                          )}
+                        </>
+                      );
+                      const cls = `flex items-center gap-2.5 rounded-md py-1.5 pl-9 pr-3 text-[13px] transition hover:bg-zinc-800/60 hover:text-white ${
+                        active ? "bg-zinc-800 text-white" : "text-zinc-400"
+                      }`;
+                      // 外链二级项（说明文档、作者网址等）用原生 <a> 新标签打开。
+                      return leaf.external ? (
+                        <a
+                          key={leaf.href}
+                          href={leaf.href}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className={cls}
+                        >
+                          {inner}
+                        </a>
+                      ) : (
+                        <Link key={leaf.href} href={leaf.href} className={cls}>
+                          {inner}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
-          {visiblePluginNav.length > 0 && (
-            <>
-              <div className="my-2 border-t border-zinc-800" />
-              {visiblePluginNav.map((item) => {
-                const Icon =
-                  (item.icon && ADMIN_ICONS[item.icon.toLowerCase()]) || undefined;
-                const active = item.exact
-                  ? pathname === item.href
-                  : pathname === item.href || pathname.startsWith(item.href + "/");
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition hover:bg-zinc-800 hover:text-white ${
-                      active ? "bg-zinc-800 text-white" : "text-zinc-300"
-                    }`}
-                  >
-                    {Icon ? (
-                      <Icon size={18} className={active ? "text-indigo-400" : ""} />
-                    ) : (
-                      <span className="inline-block h-2 w-2 rounded-full bg-zinc-600" />
-                    )}
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </>
-          )}
         </nav>
         <div className="mt-auto border-t border-zinc-800 pt-4">
           <Link

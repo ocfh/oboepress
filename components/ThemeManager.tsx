@@ -2,10 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Palette, Plus, Settings2, Trash2 } from "lucide-react";
+import { Check, ExternalLink, Palette, Plus, Settings2, Trash2 } from "lucide-react";
+import PackageUpload from "@/components/PackageUpload";
 import type { Theme } from "@/db/schema";
 
-type ThemeWithActive = Theme & { active: boolean };
+type ThemeMeta = {
+  description?: string;
+  version?: string;
+  author?: string;
+  homepage?: string | null;
+  updatedAt?: string | null;
+};
+
+type ThemeWithActive = Theme & { active: boolean; meta?: ThemeMeta | null };
 
 /**
  * Theme list: activate / create / delete.
@@ -28,10 +37,12 @@ export default function ThemeManager() {
     ]);
     const activeSlug = s?.activeThemeSlug;
     setThemes(
-      (t?.themes ?? t ?? []).map((th: Theme) => ({
-        ...th,
-        active: th.slug === activeSlug,
-      })),
+      (t?.themes ?? t ?? []).map(
+        (th: Theme & { meta?: ThemeMeta | null }) => ({
+          ...th,
+          active: th.slug === activeSlug,
+        }),
+      ),
     );
     setLoading(false);
   }
@@ -93,6 +104,10 @@ export default function ThemeManager() {
         </button>
       </div>
 
+      <div className="mb-6">
+        <PackageUpload kind="theme" onInstalled={() => void load()} />
+      </div>
+
       {loading ? (
         <p className="text-zinc-400">加载中…</p>
       ) : (
@@ -118,11 +133,43 @@ export default function ThemeManager() {
                   <Palette size={18} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-zinc-100">{theme.name}</p>
-                  <p className="truncate font-mono text-[11px] text-zinc-500">
-                    themes/{theme.slug}
-                    {theme.isDefault && " · 内置"}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate font-medium text-zinc-100">{theme.name}</p>
+                    {theme.meta?.version && (
+                      <span className="shrink-0 rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">
+                        v{theme.meta.version}
+                      </span>
+                    )}
+                  </div>
+                  {theme.meta?.description && (
+                    <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-400">
+                      {theme.meta.description}
+                    </p>
+                  )}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-zinc-500">
+                    <span className="font-mono text-[10px] text-zinc-600">
+                      themes/{theme.slug}
+                      {theme.isDefault && " · 内置"}
+                    </span>
+                    {/* 作者名即网址入口：homepage 合法时渲染为新标签页超链接 */}
+                    {theme.meta?.author &&
+                      (theme.meta.homepage && /^https?:\/\//i.test(theme.meta.homepage) ? (
+                        <a
+                          href={theme.meta.homepage}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 text-indigo-400 transition hover:text-indigo-300 hover:underline"
+                        >
+                          {theme.meta.author}
+                          <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span>{theme.meta.author}</span>
+                      ))}
+                    {theme.meta?.updatedAt && (
+                      <span className="text-zinc-600">更新于 {theme.meta.updatedAt}</span>
+                    )}
+                  </div>
                   {theme.active && (
                     <span className="mt-1.5 inline-block rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-400">
                       当前生效

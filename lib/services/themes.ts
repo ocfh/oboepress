@@ -14,9 +14,11 @@ import {
   invalidateThemeDiscovery,
   type ThemeWidgetArea,
 } from "@/themes/registry";
+import { rmSyncRetry } from "../fs-utils";
 import { ensureBootstrap } from "./bootstrap";
 import { NotFoundError, ValidationError } from "./errors";
 import { publicCached, cacheKey, bump, bumpAll } from "./public-cache";
+import { installPackage } from "./package-install";
 
 export type ThemeInput = {
   name: string;
@@ -148,6 +150,21 @@ export async function createTheme(input: ThemeInput): Promise<Theme> {
   return row!;
 }
 
+/**
+ * 从上传的 zip 安装主题：校验 manifest.json + 入口、落盘 themes/<slug>、
+ * 同步入库。不合规抛 ValidationError，安装器已保证临时文件与半成品目录被清理。
+ */
+export async function installThemeZip(buf: Buffer): Promise<Theme> {
+  await ensureBootstrap();
+  const info = installPackage("theme", buf);
+  invalidateThemeDiscovery();
+  await syncThemes();
+  const [row] = await db.select().from(themes).where(eq(themes.slug, info.slug));
+  if (!row) throw new ValidationError("主题已落盘但同步失败，请检查 manifest.json");
+  bump("theme");
+  return row;
+}
+
 /** Recursively copy a directory. */
 function copyDir(src: string, dest: string): void {
   fs.mkdirSync(dest, { recursive: true });
@@ -255,7 +272,8 @@ export async function deleteTheme(id: number): Promise<{ id: number }> {
   // Remove the theme folder too, so auto-discovery stops re-registering it.
   const dir = path.join(process.cwd(), "themes", existing.slug);
   if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+    // 刚落盘的文件可能被杀软短暂占用，退避重试避免 EBUSY 导致删除 500。
+    rmSyncRetry(dir);
   }
   // 文件夹已删：丢弃清单缓存，后续扫描不再找回该主题。
   invalidateThemeDiscovery();

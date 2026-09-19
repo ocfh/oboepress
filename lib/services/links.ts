@@ -189,8 +189,15 @@ export async function tagUrl(tag: { slug: string }): Promise<string> {
 
 /** Post listing index (the post base itself); "/" when posts live at root. */
 export function blogIndexUrlFor(cfg: PermalinkConfig): string {
-  return joinPath(baseSegs(cfg.postBase));
+  const segs = baseSegs(cfg.postBase);
+  // 文章前缀被清空（文章直接挂根级）时，首页 "/" 就是文章落地页；此时列表页
+  // 必须使用保留路径，否则「智能推荐 /」「最新文章 /」撞成同一个链接，且
+  // 全部文章页没有任何入口。保留段在 resolveSitePath 中优先于同名根级实体。
+  return joinPath(segs.length ? segs : [ROOT_BLOG_INDEX_SEGMENT]);
 }
+
+/** postBase 为空时全部文章页使用的保留单段路径。 */
+export const ROOT_BLOG_INDEX_SEGMENT = "blog";
 export async function blogIndexUrl(): Promise<string> {
   return blogIndexUrlFor(await getPermalinkConfig());
 }
@@ -373,6 +380,10 @@ export async function resolveSitePath(
 
   // Root-level single segment (prefixes deleted): try every entity type.
   if (segments.length === 1) {
+    // postBase 为空时的全部文章保留路径，优先于同名根级文章/页面/分类。
+    if (pb.length === 0 && segments[0] === ROOT_BLOG_INDEX_SEGMENT) {
+      return { kind: "blogIndex" };
+    }
     const post = await fetchPostByTail(segments, cfg, includeUnpublished);
     if (post) return { kind: "post", post };
     const { getPageBySlug } = await import("./pages");

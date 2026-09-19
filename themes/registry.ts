@@ -1,7 +1,9 @@
 import fs from "fs";
 import path from "path";
 import type { ThemeConfig } from "@/db/schema";
+import type { AdminMenuItem } from "@/lib/admin-extensions";
 import type { SettingField, SettingsSchema } from "@/lib/settings-schema";
+import type { NotFoundSettings } from "@/lib/services/not-found-config";
 
 /**
  * A theme is a self-contained folder under `themes/<slug>/`:
@@ -40,6 +42,21 @@ export interface ThemeManifest {
   description: string;
   version: string;
   author: string;
+  /** 作者网址：后台主题卡片上作者名渲染为指向该地址的超链接。 */
+  homepage?: string;
+  /** 最后更新时间（作者维护）；缺省回退 manifest.json 文件修改日期。 */
+  updatedAt?: string;
+  /**
+   * 可选的后台一级菜单声明：存在时侧栏出现以主题命名的一级菜单，
+   * 二级项（主题设置、说明文档、外链等）完全由主题作者自定义。
+   */
+  adminMenu?: {
+    label?: string;
+    icon?: string;
+    adminOnly?: boolean;
+    superOnly?: boolean;
+    items: AdminMenuItem[];
+  };
   isDefault: boolean;
   /** Design tokens — merged over DEFAULT_THEME_CONFIG. */
   config: ThemeConfig;
@@ -92,6 +109,8 @@ export interface ThemeModule {
   BlogListPage?: React.ComponentType<{ page: number }>;
   CategoryPage?: React.ComponentType<{ slug: string }>;
   SearchPage?: React.ComponentType<{ q: string }>;
+  /** Optional theme-branded 404 screen; falls back to the shared one. */
+  NotFoundPage?: React.ComponentType<{ settings: NotFoundSettings }>;
 }
 
 const THEMES_DIR = path.join(process.cwd(), "themes");
@@ -131,6 +150,14 @@ export function discoverThemes(): ThemeManifest[] {
         const manifest = JSON.parse(raw) as ThemeManifest;
         // Trust the folder name over a mistyped slug so routing never breaks.
         manifest.slug = manifest.slug || entry.name;
+        // 作者未声明更新时间时回退清单文件修改日期，后台始终有时间可展示。
+        if (!manifest.updatedAt) {
+          try {
+            manifest.updatedAt = fs.statSync(manifestPath).mtime.toISOString().slice(0, 10);
+          } catch {
+            // 读取失败时留空即可
+          }
+        }
         themes.push(manifest);
       } catch {
         // Skip invalid manifests
@@ -261,6 +288,7 @@ export async function loadThemeModule(slug: string): Promise<ThemeModule | null>
       BlogListPage: mod.BlogListPage,
       CategoryPage: mod.CategoryPage,
       SearchPage: mod.SearchPage,
+      NotFoundPage: mod.NotFoundPage,
     };
   } catch {
     return null;

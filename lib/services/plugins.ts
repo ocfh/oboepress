@@ -11,8 +11,9 @@ import {
 import { invalidatePluginCache, loadPlugins } from "@/lib/plugins/loader";
 import { coerceSettings, resolveSettings } from "@/lib/settings-schema";
 import { ensureBootstrap } from "./bootstrap";
-import { NotFoundError } from "./errors";
+import { NotFoundError, ValidationError } from "./errors";
 import { bumpAll } from "./public-cache";
+import { installPackage } from "./package-install";
 
 export type PluginView = Plugin & {
   manifest: PluginManifest | null;
@@ -55,6 +56,24 @@ export async function syncPlugins(): Promise<void> {
           author: m.author ?? "",
         },
       });
+  }
+}
+
+/**
+ * 从上传的 zip 安装插件：校验 plugin.json + 入口、落盘 plugins/<slug>、
+ * 同步入库（默认停用，绝不自动执行第三方代码）。不合规抛 ValidationError，
+ * 临时文件与半成品目录由安装器清理。
+ */
+export async function installPluginZip(buf: Buffer): Promise<PluginView> {
+  await ensureBootstrap();
+  const info = installPackage("plugin", buf);
+  invalidatePluginCache();
+  await syncPlugins();
+  bumpAll();
+  try {
+    return await getPlugin(info.slug);
+  } catch {
+    throw new ValidationError("插件已落盘但同步失败，请检查 plugin.json");
   }
 }
 
