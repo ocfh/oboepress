@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { postCategories, postTags, posts } from "@/db/schema";
 import { ensureBootstrap } from "./bootstrap";
 import { getPermalinkConfig, postUrlFor } from "./links";
+import { publicCached, cacheKey } from "./public-cache";
 
 /**
  * Archive index + related-posts queries.
@@ -24,8 +25,12 @@ export type ArchiveYear = {
   months: ArchiveMonth[];
 };
 
-/** Every published post grouped by year → month, newest first. */
-export async function getArchiveIndex(): Promise<ArchiveYear[]> {
+/** Every published post grouped by year → month, newest first. 跨请求短 TTL 缓存。 */
+export function getArchiveIndex(): Promise<ArchiveYear[]> {
+  return publicCached(cacheKey("archive", "index"), getArchiveIndexUncached);
+}
+
+async function getArchiveIndexUncached(): Promise<ArchiveYear[]> {
   await ensureBootstrap();
   const rows = await db
     .select({
@@ -57,8 +62,12 @@ export async function getArchiveIndex(): Promise<ArchiveYear[]> {
   return [...years.values()];
 }
 
-/** Total published posts — handy for the archive page header. */
-export async function getPublishedCount(): Promise<number> {
+/** Total published posts — handy for the archive page header. 跨请求短 TTL 缓存。 */
+export function getPublishedCount(): Promise<number> {
+  return publicCached(cacheKey("archive", "count"), getPublishedCountUncached);
+}
+
+async function getPublishedCountUncached(): Promise<number> {
   await ensureBootstrap();
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -78,8 +87,19 @@ export type ArchiveEntry = {
   url: string;
 };
 
-/** Flat list of every published post, newest first — the /archives timeline. */
-export async function listArchiveEntries(opts: {
+/** Flat list of every published post, newest first — the /archives timeline. 跨请求短 TTL 缓存。 */
+export function listArchiveEntries(opts: {
+  year?: number;
+  month?: number;
+  limit?: number;
+} = {}): Promise<ArchiveEntry[]> {
+  return publicCached(
+    cacheKey("archive", `entries:${opts.year ?? 0}:${opts.month ?? 0}:${opts.limit ?? 0}`),
+    () => listArchiveEntriesUncached(opts),
+  );
+}
+
+async function listArchiveEntriesUncached(opts: {
   year?: number;
   month?: number;
   limit?: number;
@@ -126,7 +146,13 @@ export type RelatedPost = {
   url: string;
 };
 
-export async function getRelatedPosts(
+export function getRelatedPosts(postId: number, limit = 4): Promise<RelatedPost[]> {
+  return publicCached(cacheKey("archive", `related:${postId}:${limit}`), () =>
+    getRelatedPostsUncached(postId, limit),
+  );
+}
+
+async function getRelatedPostsUncached(
   postId: number,
   limit = 4,
 ): Promise<RelatedPost[]> {

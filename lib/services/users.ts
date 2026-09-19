@@ -7,6 +7,8 @@ import type { UserInput } from "@/lib/validation";
 import { can } from "@/lib/rbac";
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
+import { clearPasswordlessMark, isPasswordlessUser } from "./oauth";
+import { bump } from "./public-cache";
 
 function publicUser(u: User) {
   const { passwordHash, ...rest } = u;
@@ -138,6 +140,8 @@ export async function updateUser(
     })
     .where(eq(users.id, id))
     .returning();
+  // 昵称/角色/状态变更会反映在文章列表项的作者信息上，失效 posts 缓存。
+  bump("posts");
   return publicUser(row);
 }
 
@@ -165,6 +169,7 @@ export async function changeOwnProfile(
     .set({ name, email, updatedAt: new Date() })
     .where(eq(users.id, actor.id))
     .returning();
+  bump("posts");
   return publicUser(row);
 }
 
@@ -176,12 +181,17 @@ export async function changeOwnPassword(
 ): Promise<{ id: number }> {
   const [target] = await db.select().from(users).where(eq(users.id, actor.id));
   if (!target) throw new NotFoundError("用户不存在");
-  if (!(await verifyPassword(currentPassword, target.passwordHash)))
+  // 纯第三方登录（nopassword）用户没有自己的旧密码，首次设置免验证；
+  // 其他情况必须先验证当前密码。
+  const nopassword = await isPasswordlessUser(actor.id);
+  if (!nopassword && !(await verifyPassword(currentPassword, target.passwordHash)))
     throw new ValidationError("当前密码不正确");
   await db
     .update(users)
     .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
     .where(eq(users.id, actor.id));
+  // 纯第三方登录用户成功设置密码后，移除 nopassword 标记，此后可解绑全部第三方账号。
+  await clearPasswordlessMark(actor.id);
   return { id: actor.id };
 }
 
@@ -194,5 +204,35 @@ export async function deleteUser(
   const [target] = await db.select({ id: users.id }).from(users).where(eq(users.id, id));
   if (!target) throw new NotFoundError("用户不存在");
   await db.delete(users).where(eq(users.id, id));
+  bump("posts");
   return { id };
+}
+
+/** 按账号查用户：含 @ 走邮箱（大小写不敏感），否则走昵称。供找回密码复用。 */
+export async function findUserByAccount(account: string): Promise<User | null> {
+  const identifier = account.trim();
+  if (!identifier) return null;
+  const [row] = await db
+    .select()
+    .from(users)
+    .where(
+      identifier.includes("@")
+        ? sql`lower(${users.email}) = lower(${identifier})`
+        : sql`lower(${users.name}) = lower(${identifier})`,
+    );
+  return row ?? null;
+}
+
+/** 邮箱验证码校验通过后重置密码，返回用户基础信息用于审计日志。 */
+export async function resetUserPassword(
+  userId: number,
+  newPassword: string,
+): Promise<{ id: number; name: string; email: string | null }> {
+  await db
+    .update(users)
+    .set({ passwordHash: await hashPassword(newPassword), updatedAt: new Date() })
+    .where(eq(users.id, userId));
+  // 重置后不再是「纯第三方无密码」账号。
+  await clearPasswordlessMark(userId);
+  return { id: userId, name: "", email: null };
 }

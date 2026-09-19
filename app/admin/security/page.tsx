@@ -18,6 +18,9 @@ type SecurityCfg = {
   captchaEnabled: boolean;
   captchaMode: CaptchaMode;
   captchaVerifyUrl: string;
+  throttleEnabled: boolean;
+  throttleMaxFailures: number;
+  throttleWindowMinutes: number;
 };
 
 const inputCls =
@@ -228,6 +231,72 @@ export default function SecurityAdmin() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-100">登录失败限流</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              滑动窗口内同一账号或同一 IP 的连续失败登录达到上限后，临时拒绝继续尝试；
+              窗口时间滑过后自动解锁，无需手动处理。
+            </p>
+          </div>
+          <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+            <input
+              type="checkbox"
+              className="peer sr-only"
+              checked={cfg.throttleEnabled}
+              onChange={(e) => setCfg({ ...cfg, throttleEnabled: e.target.checked })}
+            />
+            <span className="h-6 w-11 rounded-full bg-zinc-700 transition peer-checked:bg-indigo-600 after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
+          </label>
+        </div>
+
+        {cfg.throttleEnabled && (
+          <div className="mt-5 grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-200">
+                最大失败次数
+              </label>
+              <input
+                type="number"
+                min={3}
+                max={50}
+                className={inputCls}
+                value={cfg.throttleMaxFailures}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    throttleMaxFailures: Number(e.target.value),
+                  })
+                }
+              />
+              <p className="mt-1 text-xs text-zinc-500">3 ~ 50 次，默认 5 次</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-zinc-200">
+                统计 / 锁定时长（分钟）
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={1440}
+                className={inputCls}
+                value={cfg.throttleWindowMinutes}
+                onChange={(e) =>
+                  setCfg({
+                    ...cfg,
+                    throttleWindowMinutes: Number(e.target.value),
+                  })
+                }
+              />
+              <p className="mt-1 text-xs text-zinc-500">
+                1 ~ 1440 分钟，默认 15 分钟
+              </p>
+            </div>
           </div>
         )}
       </div>

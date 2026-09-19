@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Save, FileDown, FileUp, Eye, ChevronDown, CircleCheck, MessageSquare, Hash, Tag, Search, Plus, Folder } from "lucide-react";
 import BlockEditor from "@/components/BlockEditor";
@@ -17,6 +17,17 @@ import {
 
 type Option = { id: number; name: string };
 
+/** ISO 时间 → datetime-local 控件需要的本地时区字符串。 */
+function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
 export type EditorInitial = {
   id: number;
   title: string;
@@ -24,6 +35,7 @@ export type EditorInitial = {
   excerpt: string | null;
   content: Block[];
   status: string;
+  publishedAt?: string | null;
   featuredImage: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
@@ -64,6 +76,8 @@ export default function ContentEditor({
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [excerpt, setExcerpt] = useState(initial?.excerpt ?? "");
   const [status, setStatus] = useState(initial?.status ?? "draft");
+  // 定时发布：草稿 + 未来发布时间，到点由服务端懒翻转自动发布。
+  const [scheduledAt, setScheduledAt] = useState(toLocalInput(initial?.publishedAt));
   const [featuredImage, setFeaturedImage] = useState(initial?.featuredImage ?? "");
   const [seoTitle, setSeoTitle] = useState(initial?.seoTitle ?? "");
   const [seoDescription, setSeoDescription] = useState(initial?.seoDescription ?? "");
@@ -108,15 +122,15 @@ export default function ContentEditor({
     return list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
   }
 
-  async function save() {
-    setSaving(true);
-    setMsg("");
+  // 手动保存与草稿自动保存共用同一份请求体。
+  function buildPayload(): Record<string, unknown> {
     const payload: Record<string, unknown> = {
       title,
       slug: slug || undefined,
       excerpt: excerpt || undefined,
       content: blocks,
       status,
+      publishedAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
       featuredImage: featuredImage || undefined,
       seoTitle: seoTitle || undefined,
       seoDescription: seoDescription || undefined,
@@ -134,6 +148,64 @@ export default function ContentEditor({
     } else {
       if (parentId !== "") payload.parentId = parentId;
     }
+    return payload;
+  }
+
+  // --- 草稿自动保存：仅对已存在的草稿生效，防抖 2.5s 静默 PATCH -------------
+  const [autoState, setAutoState] = useState<"idle" | "pending" | "saved" | "error">("idle");
+  const [autoAt, setAutoAt] = useState("");
+  // 已落库内容的快照，用于 dirty 判断；手动保存期间禁止自动保存抢占。
+  const baselineRef = useRef("");
+  const savingRef = useRef(false);
+  const snapshot = () => JSON.stringify(buildPayload());
+
+  async function autosave() {
+    if (savingRef.current || isNew) return;
+    try {
+      const res = await fetch(`/api/${base}/${initial!.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildPayload()),
+      });
+      if (!res.ok) {
+        setAutoState("error");
+        return;
+      }
+      baselineRef.current = snapshot();
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setAutoAt(`${pad(now.getHours())}:${pad(now.getMinutes())}`);
+      setAutoState("saved");
+    } catch {
+      setAutoState("error");
+    }
+  }
+
+  useEffect(() => {
+    // 新建文章尚无 id；已发布/归档内容不做静默写入，避免意外改动线上内容。
+    if (isNew || status !== "draft") return;
+    if (!baselineRef.current) {
+      baselineRef.current = snapshot();
+      return;
+    }
+    if (snapshot() === baselineRef.current) return;
+    setAutoState("pending");
+    const timer = setTimeout(() => {
+      void autosave();
+    }, 2500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    title, slug, excerpt, blocks, status, scheduledAt, featuredImage,
+    seoTitle, seoDescription, seoKeywords, commentStatus, authorId,
+    parentId, categoryIds, tagIds, metas, format, formatMeta, pinned,
+  ]);
+
+  async function save() {
+    setSaving(true);
+    savingRef.current = true;
+    setMsg("");
+    const payload = buildPayload();
 
     const url = isNew ? `/api/${base}` : `/api/${base}/${initial!.id}`;
     const method = isNew ? "POST" : "PATCH";
@@ -143,8 +215,10 @@ export default function ContentEditor({
       body: JSON.stringify(payload),
     });
     setSaving(false);
+    savingRef.current = false;
     if (res.ok) {
       setMsg("已保存 ✓");
+      if (!isNew) baselineRef.current = snapshot();
       if (isNew) {
         router.push(`/admin/${base}`);
         router.refresh();
@@ -201,6 +275,15 @@ export default function ContentEditor({
         <div className="flex items-center gap-3">
           {msg && <span className="text-sm text-emerald-400">{msg}</span>}
           {mdMsg && <span className="text-sm text-emerald-400">{mdMsg}</span>}
+          {!isNew && status === "draft" && autoState === "pending" && (
+            <span className="text-xs text-zinc-500">自动保存中…</span>
+          )}
+          {!isNew && status === "draft" && autoState === "saved" && (
+            <span className="text-xs text-zinc-500">已自动保存 {autoAt}</span>
+          )}
+          {!isNew && status === "draft" && autoState === "error" && (
+            <span className="text-xs text-rose-400">自动保存失败</span>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -297,6 +380,20 @@ export default function ContentEditor({
               <option value="published">已发布</option>
               <option value="archived">已归档</option>
             </select>
+
+            <label className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
+              <FileUp size={15} className="text-zinc-500" />
+              发布时间
+            </label>
+            <input
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="mt-1 w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm [color-scheme:dark]"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              草稿状态下设为未来时间即定时发布，到点自动上线；留空则按保存时间。
+            </p>
 
             <label className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
               <MessageSquare size={15} className="text-zinc-500" />

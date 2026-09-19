@@ -26,6 +26,7 @@ export default async function EditPage({
         excerpt: page.excerpt,
         content: page.content,
         status: page.status,
+        publishedAt: page.publishedAt ? page.publishedAt.toISOString() : null,
         featuredImage: page.featuredImage,
         seoTitle: page.seoTitle,
         seoDescription: page.seoDescription,

@@ -38,6 +38,10 @@ export interface MemberSettings {
   phoneRequired: boolean;
   /** 注册是否需要验证码（方式与校验接口复用后台安全配置）。 */
   captchaEnabled: boolean;
+  /** 邀请制：开启后注册必须提交一个管理员预设的有效邀请码。 */
+  inviteOnly: boolean;
+  /** 有效邀请码列表（明文短码，校验时忽略大小写）。 */
+  inviteCodes: string[];
   /** 新注册用户的默认角色：订阅者 / 作者。 */
   defaultRole: MemberDefaultRole;
 }
@@ -48,6 +52,8 @@ const DEFAULT_SETTINGS: MemberSettings = {
   emailRequired: true,
   phoneRequired: false,
   captchaEnabled: false,
+  inviteOnly: false,
+  inviteCodes: [],
   defaultRole: "subscriber",
 };
 
@@ -84,6 +90,18 @@ export async function saveMemberSettings(
       typeof input.captchaEnabled === "boolean"
         ? input.captchaEnabled
         : current.captchaEnabled,
+    inviteOnly:
+      typeof input.inviteOnly === "boolean" ? input.inviteOnly : current.inviteOnly,
+    // 每行一个码：去空白、去重、限长 64，最多 200 个。
+    inviteCodes: Array.isArray(input.inviteCodes)
+      ? [
+          ...new Set(
+            input.inviteCodes
+              .map((c) => String(c).trim())
+              .filter((c) => c.length > 0 && c.length <= 64),
+          ),
+        ].slice(0, 200)
+      : current.inviteCodes,
     defaultRole:
       input.defaultRole === "subscriber" || input.defaultRole === "author"
         ? input.defaultRole
@@ -139,6 +157,7 @@ export const getPublicRegisterConfig = cache(async () => {
       emailVerify: false,
       phoneVerify: false,
       defaultRole: "subscriber" as const,
+      inviteOnly: false,
       captcha: { enabled: false, mode: null as null | "builtin" | "custom" },
     };
   }
@@ -150,6 +169,7 @@ export const getPublicRegisterConfig = cache(async () => {
     emailVerify,
     phoneVerify,
     defaultRole: member.defaultRole,
+    inviteOnly: member.inviteOnly,
     captcha: {
       enabled: member.captchaEnabled,
       mode: member.captchaEnabled ? sec.captchaMode : null,
@@ -169,6 +189,8 @@ export type RegisterInput = {
   emailCode?: string;
   /** 手机验证码（notify.register.phoneVerify 开启且填了手机号时必填）。 */
   phoneCode?: string;
+  /** 邀请码（inviteOnly 开启时必填，与管理员预设列表忽略大小写匹配）。 */
+  inviteCode?: string;
 };
 
 /**
@@ -212,6 +234,14 @@ export async function registerMember(input: RegisterInput): Promise<SessionUser>
   await ensureMigrations();
   const member = await getMemberSettings();
   if (!member.registerEnabled) throw new ValidationError("注册已关闭");
+
+  // 邀请制：与预设列表忽略大小写匹配。
+  if (member.inviteOnly) {
+    const code = (input.inviteCode ?? "").trim();
+    if (!code) throw new ValidationError("请填写邀请码");
+    const hit = member.inviteCodes.some((c) => c.toLowerCase() === code.toLowerCase());
+    if (!hit) throw new ValidationError("邀请码无效");
+  }
 
   const name = input.name.trim();
   if (!NAME_RE.test(name)) {

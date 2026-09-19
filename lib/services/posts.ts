@@ -1,11 +1,14 @@
+import { createHash } from "node:crypto";
+import { headers } from "next/headers";
 import { and, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { applyFilters, HOOKS } from "@/lib/hooks";
+import { applyFilters, doAction, HOOKS } from "@/lib/hooks";
 import {
   categories,
   postCategories,
   postTags,
+  postVisitors,
   posts,
   tags,
   users,
@@ -21,6 +24,7 @@ import { getPermalinkConfig, postUrlFor, categoryUrlFor, tagUrlFor } from "./lin
 import { ForbiddenError, NotFoundError } from "./errors";
 import { getPostMetas, setPostMetas } from "./metas";
 import { ensurePluginsLoaded } from "./plugins";
+import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type PostListItem = Post & {
   /** Public URL under the current permalink config. */
@@ -54,8 +58,8 @@ export type PostQuery = {
   pinned?: boolean;
   /** Exclude one post id — used by "related posts". */
   excludeId?: number;
-  /** Sort order: "date" (default) or "views" for most-read lists. */
-  orderBy?: "date" | "views";
+  /** Sort order: "date" (default), "views" most-read, "likes"/"comments" for theme ranking boards. */
+  orderBy?: "date" | "views" | "likes" | "comments";
   /** Random order — used by theme "random posts" widgets. */
   random?: boolean;
   limit?: number;
@@ -132,12 +136,32 @@ async function attachTaxonomies(ids: number[]): Promise<{
   return { categories: cats, tags: tg };
 }
 
-export async function listPosts(opts: PostQuery = {}): Promise<{
+/**
+ * 公开文章列表。仅对「已发布、非随机、非搜索」形态做跨请求短 TTL 缓存：
+ * 后台列表（无 status 或 draft 等）、随机文章、搜索一律实时查库。
+ * 同请求内的重复调用（metadata/页面、首屏多区块）再由 React cache 合并。
+ */
+export function listPosts(opts: PostQuery = {}): Promise<{
+  items: PostListItem[];
+  total: number;
+}> {
+  if (opts.status === "published" && !opts.random && !opts.search) {
+    return publicCached(cacheKey("posts", `list:${JSON.stringify(opts)}`), () =>
+      listPostsUncached(opts),
+    );
+  }
+  return listPostsUncached(opts);
+}
+
+async function listPostsUncached(opts: PostQuery): Promise<{
   items: PostListItem[];
   total: number;
 }> {
   const limit = Math.min(opts.limit ?? 20, 100);
   const offset = opts.offset ?? 0;
+
+  // 每个前台列表请求都顺手触发一次到点定时发布翻转（内部 60s 节流）。
+  await sweepDuePosts();
 
   const conditions = [];
   if (opts.status) conditions.push(eq(posts.status, opts.status as ContentStatus));
@@ -216,9 +240,14 @@ export async function listPosts(opts: PostQuery = {}): Promise<{
     ? [sql`random()`]
     : opts.orderBy === "views"
       ? [desc(posts.views), desc(posts.publishedAt)]
-      : opts.pinnedFirst
-        ? [desc(posts.pinned), desc(posts.publishedAt), desc(posts.createdAt)]
-        : [desc(posts.publishedAt), desc(posts.createdAt)];
+      : // 排行榜三榜：赞数 / 评论数优先，发布时间兜底并列
+        opts.orderBy === "likes"
+        ? [desc(posts.likes), desc(posts.publishedAt)]
+        : opts.orderBy === "comments"
+          ? [desc(posts.commentsCount), desc(posts.publishedAt)]
+          : opts.pinnedFirst
+            ? [desc(posts.pinned), desc(posts.publishedAt), desc(posts.createdAt)]
+            : [desc(posts.publishedAt), desc(posts.createdAt)];
 
   const rowShape = {
     post: posts,
@@ -310,9 +339,20 @@ async function attachMetas(ids: number[]): Promise<Record<number, Record<string,
   return out;
 }
 
-export async function getPostById(
+export function getPostById(
   id: number,
   includeUnpublished = false,
+): Promise<PostListItem> {
+  // 后台/预览取未发布内容时旁路缓存；公开读取跨请求短 TTL 复用。
+  if (includeUnpublished) return getPostByIdUncached(id, true);
+  return publicCached(cacheKey("posts", `get:id:${id}`), () =>
+    getPostByIdUncached(id, false),
+  );
+}
+
+async function getPostByIdUncached(
+  id: number,
+  includeUnpublished: boolean,
 ): Promise<PostListItem> {
   const [row] = await db
     .select({
@@ -326,7 +366,7 @@ export async function getPostById(
     .where(eq(posts.id, id));
 
   if (!row) throw new NotFoundError("文章不存在");
-  if (!includeUnpublished && row.post.status !== "published")
+  if (!includeUnpublished && !(await flipIfDue(row.post)))
     throw new NotFoundError("文章不存在");
 
   const [tax, metas, cfg] = await Promise.all([
@@ -360,7 +400,20 @@ export function getPostByInitial(value: string, includeUnpublished = false) {
   return getPostByColumn(posts.initialSlug, value, includeUnpublished);
 }
 
-async function getPostByColumn(
+// 公开按列读取统一入口：未发布旁路，其余走跨请求短 TTL 缓存。
+// col.name 作为键前缀（id/slug/pinyinSlug/initialSlug 互不冲突）。
+function getPostByColumn(
+  col: AnyPgColumn,
+  value: string,
+  includeUnpublished: boolean,
+): Promise<PostListItem> {
+  if (includeUnpublished) return getPostByColumnUncached(col, value, true);
+  return publicCached(cacheKey("posts", `get:${col.name}:${value}`), () =>
+    getPostByColumnUncached(col, value, false),
+  );
+}
+
+async function getPostByColumnUncached(
   col: AnyPgColumn,
   value: string,
   includeUnpublished: boolean,
@@ -377,7 +430,7 @@ async function getPostByColumn(
     .where(eq(col, value));
 
   if (!row) throw new NotFoundError("文章不存在");
-  if (!includeUnpublished && row.post.status !== "published")
+  if (!includeUnpublished && !(await flipIfDue(row.post)))
     throw new NotFoundError("文章不存在");
 
   const [tax, metas, cfg] = await Promise.all([
@@ -452,7 +505,20 @@ export async function createPost(user: SessionUser, input: PostInput) {
 
   await setTaxonomies(post.id, input.categoryIds, input.tagIds);
   if (input.metas) await setPostMetas(post.id, input.metas);
-  return getPostById(post.id, true);
+
+  const saved = await getPostById(post.id, true);
+  if (saved) {
+    await ensurePluginsLoaded();
+    doAction(HOOKS.postSaved, { post: saved });
+    // 定时发布（published 但 publishedAt 在未来）不算首次发布，到点翻转时再触发。
+    if (saved.status === "published" && isLive(saved)) doAction(HOOKS.postPublished, { post: saved });
+  }
+  return saved;
+}
+
+/** 文章当前是否已真正公开发布（状态为 published 且发布时间已到）。 */
+function isLive(p: { status: string; publishedAt: Date | null }): boolean {
+  return p.status === "published" && (!p.publishedAt || p.publishedAt.getTime() <= Date.now());
 }
 
 export async function updatePost(
@@ -524,7 +590,14 @@ export async function updatePost(
     await setTaxonomies(id, input.categoryIds ?? [], input.tagIds ?? []);
   if (input.metas) await setPostMetas(id, input.metas);
 
-  return getPostById(id, true);
+  const saved = await getPostById(id, true);
+  if (saved) {
+    await ensurePluginsLoaded();
+    doAction(HOOKS.postSaved, { post: saved });
+    // 仅在「未发布 → 已发布」的跳变瞬间触发一次（含定时到点后的首次保存）。
+    if (!isLive(existing) && isLive(saved)) doAction(HOOKS.postPublished, { post: saved });
+  }
+  return saved;
 }
 
 export async function deletePost(user: SessionUser, id: number) {
@@ -532,12 +605,173 @@ export async function deletePost(user: SessionUser, id: number) {
   if (!canModifyContent(user.role, existing.authorId, user.id))
     throw new ForbiddenError();
   await db.delete(posts).where(eq(posts.id, id));
+  // 删除不经过 postSaved 钩子，直接失效公开缓存（列表/归档/小工具）。
+  bump("posts");
+  bump("archive");
+  bump("widgets");
   return { id };
 }
 
-/** Increment the read counter (called on each public view). */
+/**
+ * 批量修改文章状态。逐条复用既有所有权规则（作者仅自己、编辑/管理员任意），
+ * 无权限的 id 静默跳过；返回实际更新条数。发布跳变照常触发 postPublished。
+ */
+export async function bulkUpdateStatus(
+  user: SessionUser,
+  ids: number[],
+  status: ContentStatus,
+): Promise<{ updated: number }> {
+  const rows = await db.select().from(posts).where(inArray(posts.id, ids));
+  const allowed = rows.filter((p) =>
+    canModifyContent(user.role, p.authorId, user.id),
+  );
+  if (!allowed.length) return { updated: 0 };
+  const allowedIds = allowed.map((p) => p.id);
+
+  await db
+    .update(posts)
+    .set(
+      status === "published"
+        ? {
+            status,
+            // 草稿直接发布时补当前时间，已有发布时间（含定时时间）保持不变。
+            publishedAt: sql`COALESCE(${posts.publishedAt}, now())`,
+            updatedAt: new Date(),
+          }
+        : { status, updatedAt: new Date() },
+    )
+    .where(inArray(posts.id, allowedIds));
+
+  await ensurePluginsLoaded();
+  for (const existing of allowed) {
+    const saved = await getPostById(existing.id, true);
+    if (!saved) continue;
+    doAction(HOOKS.postSaved, { post: saved });
+    if (!isLive(existing) && isLive(saved)) doAction(HOOKS.postPublished, { post: saved });
+  }
+  return { updated: allowedIds.length };
+}
+
+/** 批量删除文章，所有权规则同 bulkUpdateStatus；返回实际删除条数。 */
+export async function bulkDelete(
+  user: SessionUser,
+  ids: number[],
+): Promise<{ deleted: number }> {
+  const rows = await db
+    .select({ id: posts.id, authorId: posts.authorId })
+    .from(posts)
+    .where(inArray(posts.id, ids));
+  const allowedIds = rows
+    .filter((p) => canModifyContent(user.role, p.authorId, user.id))
+    .map((p) => p.id);
+  if (!allowedIds.length) return { deleted: 0 };
+  await db.delete(posts).where(inArray(posts.id, allowedIds));
+  // 批量删除同样不发钩子，直接失效。
+  bump("posts");
+  bump("archive");
+  bump("widgets");
+  return { deleted: allowedIds.length };
+}
+
+/**
+ * 定时发布：请求驱动的懒翻转扫描。定时文章以 status=draft + 未来 publishedAt
+ * 保存，前台天然不可见；扫描把到点文章翻成 published 并触发 post.published。
+ * 进程内 60 秒最多扫描一次，无需定时任务/常驻进程。
+ */
+let lastDueSweep = 0;
+export async function sweepDuePosts(): Promise<void> {
+  const now = Date.now();
+  if (now - lastDueSweep < 60_000) return;
+  lastDueSweep = now;
+  try {
+    const due = await db
+      .select({ id: posts.id })
+      .from(posts)
+      .where(
+        and(
+          eq(posts.status, "draft"),
+          sql`${posts.publishedAt} is not null`,
+          sql`${posts.publishedAt} <= now()`,
+        ),
+      )
+      .limit(50);
+    if (!due.length) return;
+    const ids = due.map((r) => r.id);
+    await db
+      .update(posts)
+      .set({ status: "published", updatedAt: new Date() })
+      .where(inArray(posts.id, ids));
+    await ensurePluginsLoaded();
+    for (const id of ids) {
+      const post = await getPostById(id, true);
+      if (post) doAction(HOOKS.postPublished, { post });
+    }
+  } catch (e) {
+    console.error("[posts] 定时发布扫描失败：", e);
+  }
+}
+
+/**
+ * 公开读取命中草稿时：若发布时间已到（定时文章），用条件 UPDATE 即时翻转。
+ * 仅在直接访问到草稿的罕见路径触发，普通已发布文章零额外查询。
+ */
+async function flipIfDue(p: Post): Promise<boolean> {
+  if (p.status === "published") return true;
+  if (!p.publishedAt || p.publishedAt.getTime() > Date.now()) return false;
+  const flipped = await db
+    .update(posts)
+    .set({ status: "published", updatedAt: new Date() })
+    .where(and(eq(posts.id, p.id), eq(posts.status, "draft")))
+    .returning({ id: posts.id });
+  if (!flipped.length) return false;
+  await ensurePluginsLoaded();
+  const fresh = await getPostById(p.id, true);
+  if (fresh) doAction(HOOKS.postPublished, { post: fresh });
+  return true;
+}
+
+/**
+ * 浏览计数（前台每次访问调用）。PV 每次刷新都 +1；UV 按「IP + UA」哈希去重，
+ * 同一访客对同一文章只计一次。访客键只存哈希，不落原始 IP/UA。
+ */
 export async function incrementViews(id: number): Promise<void> {
-  await db.execute(sql`update ${posts} set views = views + 1 where id = ${id}`);
+  const key = await visitorKey();
+  let isNewVisitor = false;
+  if (key) {
+    try {
+      // 唯一索引冲突即老访客：ON CONFLICT DO NOTHING 后 returning 为空。
+      const inserted = await db
+        .insert(postVisitors)
+        .values({ postId: id, visitorKey: key })
+        .onConflictDoNothing()
+        .returning({ postId: postVisitors.postId });
+      isNewVisitor = inserted.length > 0;
+    } catch {
+      // 去重表不可用时退化为只计 PV，不影响文章页渲染。
+      isNewVisitor = false;
+    }
+  }
+  if (isNewVisitor) {
+    await db.execute(
+      sql`update ${posts} set views = views + 1, unique_views = unique_views + 1 where id = ${id}`,
+    );
+  } else {
+    await db.execute(sql`update ${posts} set views = views + 1 where id = ${id}`);
+  }
+}
+
+/** 取当前请求访客的去重键（IP+UA 的 SHA-256）；请求上下文外返回 null。 */
+async function visitorKey(): Promise<string | null> {
+  try {
+    const h = await headers();
+    const fwd = h.get("x-forwarded-for");
+    const ip = (fwd ? fwd.split(",")[0] : h.get("x-real-ip"))?.trim() || "";
+    const ua = h.get("user-agent") || "";
+    if (!ip && !ua) return null;
+    return createHash("sha256").update(`${ip}|${ua}`).digest("hex");
+  } catch {
+    return null;
+  }
 }
 
 /**

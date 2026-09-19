@@ -12,6 +12,7 @@ import { invalidatePluginCache, loadPlugins } from "@/lib/plugins/loader";
 import { coerceSettings, resolveSettings } from "@/lib/settings-schema";
 import { ensureBootstrap } from "./bootstrap";
 import { NotFoundError } from "./errors";
+import { bumpAll } from "./public-cache";
 
 export type PluginView = Plugin & {
   manifest: PluginManifest | null;
@@ -94,6 +95,8 @@ export async function setPluginEnabled(
   invalidatePluginCache();
   pluginsReady = false;
   await ensurePluginsLoaded();
+  // 插件可改写任意内容过滤器（置顶、小工具、head 等），启停后全站缓存作废。
+  bumpAll();
   return getPlugin(slug);
 }
 
@@ -113,6 +116,7 @@ export async function updatePluginSettings(
   invalidatePluginCache();
   pluginsReady = false;
   await ensurePluginsLoaded();
+  bumpAll();
   return getPlugin(slug);
 }
 

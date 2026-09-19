@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       password: body.data.password,
       emailCode: body.data.emailCode,
       phoneCode: body.data.phoneCode,
+      inviteCode: body.data.inviteCode,
     });
     await setSessionCookie(user);
     return ok({ user });

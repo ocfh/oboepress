@@ -41,6 +41,7 @@ export default async function EditPost({
         excerpt: post.excerpt,
         content: post.content,
         status: post.status,
+        publishedAt: post.publishedAt ? post.publishedAt.toISOString() : null,
         featuredImage: post.featuredImage,
         seoTitle: post.seoTitle,
         seoDescription: post.seoDescription,

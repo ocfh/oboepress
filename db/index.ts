@@ -91,20 +91,57 @@ function sweepStalePgLocks(dataDir: string): void {
  * Registered once across dev hot-reloads via a global guard.
  */
 function registerGracefulShutdown(): void {
-  const g = globalThis as unknown as { __oboeDbShutdown?: boolean };
+  const g = globalThis as unknown as {
+    __oboeDbShutdown?: boolean;
+    __oboeDbClosing?: Promise<void>;
+    __oboeDbCloseTarget?: PGlite | null;
+  };
   if (g.__oboeDbShutdown) return;
   g.__oboeDbShutdown = true;
-  let closing = false;
-  const flush = () => {
-    if (closing) return;
-    closing = true;
-    // Fire-and-forget: do not block or re-exit; the runtime's own signal
-    // handling owns process termination.
-    pgliteClient?.close().catch(() => {});
+
+  // 必须真正 await 到 PGlite 写完 shutdown checkpoint（close 内部会做
+  // CHECKPOINT 并同步 pg_control/WAL）。此前 fire-and-forget 的写法会让
+  // 进程在落盘中途退出，曾导致 pg_control 检查点指针落进 WAL 记录体内、
+  // 重启 PANIC "could not locate a valid checkpoint record" 的事故。
+  // 按客户端实例缓存：运行时 reconfigureDatabase 换库后，新客户端仍会被关。
+  const closeDb = (): Promise<void> => {
+    if (!g.__oboeDbClosing || g.__oboeDbCloseTarget !== pgliteClient) {
+      const client = pgliteClient;
+      g.__oboeDbCloseTarget = client;
+      g.__oboeDbClosing = (async () => {
+        if (!client) return;
+        await client.close();
+        if (pgliteClient === client) pgliteClient = null;
+      })().catch((err) => {
+        // 关闭失败不再抛出（进程已在退出路径上），仅记录便于排查。
+        console.error("[db] PGlite close error:", err);
+      });
+    }
+    return g.__oboeDbClosing;
   };
-  process.once("SIGINT", flush);
-  process.once("SIGTERM", flush);
-  process.once("beforeExit", flush);
+
+  // 抢占到信号监听器链最前面：先等数据库落盘，再把信号重新发给进程，
+  // 让 Next 自身注册的 SIGINT/SIGTERM 处理器完成 HTTP 服务优雅停止。
+  const onSignal = (signal: NodeJS.Signals) => {
+    const forceTimer = setTimeout(() => {
+      // WASM 极端卡死时的兜底：宁可强退也不挂死停机流程。
+      console.error("[db] PGlite close timed out, forcing exit.");
+      process.exit(1);
+    }, 8000);
+    forceTimer.unref?.();
+    void closeDb().finally(() => {
+      clearTimeout(forceTimer);
+      process.removeAllListeners(signal);
+      process.kill(process.pid, signal);
+    });
+  };
+  process.prependOnceListener("SIGINT", () => onSignal("SIGINT"));
+  process.prependOnceListener("SIGTERM", () => onSignal("SIGTERM"));
+  // 事件循环自然排空（脚本类场景）时的最后机会，返回的 Promise 会让
+  // Node 再跑一轮微任务，保证 close 真正执行完。
+  process.once("beforeExit", () => {
+    void closeDb();
+  });
 }
 
 function createDb(): Database {

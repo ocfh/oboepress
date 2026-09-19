@@ -6,6 +6,8 @@ import {
   listArchiveEntries,
 } from "@/lib/services/archives";
 import { formatSiteDate, getSettings } from "@/lib/services/settings";
+import { maintenanceGate } from "@/lib/services/maintenance";
+import MaintenanceScreen from "@/components/site/MaintenanceScreen";
 import { POST_FORMATS } from "@/lib/post-formats";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,10 @@ export default async function ArchivesPage({
 }) {
   const year = Number(searchParams?.year) || undefined;
   const month = Number(searchParams?.month) || undefined;
+
+  // 维护模式优先，避免维护期间继续查询归档数据。
+  const maintenance = await maintenanceGate();
+  if (maintenance) return <MaintenanceScreen settings={maintenance} />;
 
   const [index, total, entries, settings] = await Promise.all([
     getArchiveIndex(),

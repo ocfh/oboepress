@@ -7,7 +7,8 @@ import { ForbiddenError, NotFoundError } from "./errors";
 import { getSettings } from "./settings";
 import { getAvatarUrl } from "@/lib/avatar";
 import { ensurePluginsLoaded } from "./plugins";
-import { applyAsyncFilters, HOOKS } from "@/lib/hooks";
+import { applyAsyncFilters, doAction, HOOKS } from "@/lib/hooks";
+import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type CommentInput = {
   postId: number;
@@ -94,6 +95,14 @@ async function bumpCount(postType: string, postId: number, delta: number) {
     .where(eq(t.id, postId));
 }
 
+/** 评论写操作统一失效：评论树/计数 + 带冗余评论数的文章、页面与小工具。 */
+function bumpCommentCaches() {
+  bump("comments");
+  bump("posts");
+  bump("pages");
+  bump("widgets");
+}
+
 function triggered(keywords: string, haystack: string): boolean {
   if (!keywords) return false;
   const words = keywords.split(/\r?\n/).map((w) => w.trim()).filter(Boolean);
@@ -145,8 +154,14 @@ export async function listComments(filter: {
   return { items, total: Number(totalRows[0]?.n ?? 0) };
 }
 
-/** Public-facing tree of published comments for a post/page. */
-export async function getPublishedTree(postId: number, postType: string) {
+/** Public-facing tree of published comments for a post/page. 跨请求短 TTL 缓存。 */
+export function getPublishedTree(postId: number, postType: string) {
+  return publicCached(cacheKey("comments", `tree:${postType}:${postId}`), () =>
+    getPublishedTreeUncached(postId, postType),
+  );
+}
+
+async function getPublishedTreeUncached(postId: number, postType: string) {
   const { items } = await listComments({
     postId,
     postType,
@@ -250,6 +265,15 @@ export async function createComment(input: CommentInput): Promise<{
 
   if (status === "published") await bumpCount(postType, input.postId, 1);
 
+  // 评论邮件通知等插件挂载点（待审核评论同样触发，插件可按 isPublic 区分措辞）。
+  doAction(HOOKS.commentCreated, {
+    comment,
+    postType,
+    postId: input.postId,
+    postTitle: parent.title,
+    isPublic: status === "published",
+  });
+
   return { comment, isPublic: status === "published" };
 }
 
@@ -259,13 +283,15 @@ export async function getComment(id: number): Promise<Comment> {
   return row;
 }
 
-/** Public comment count — used by theme "blog stat" widgets. */
-export async function getPublicCommentCount(): Promise<number> {
-  const rows = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(comments)
-    .where(eq(comments.status, "published"));
-  return Number(rows[0]?.count ?? 0);
+/** Public comment count — used by theme "blog stat" widgets. 跨请求短 TTL 缓存。 */
+export function getPublicCommentCount(): Promise<number> {
+  return publicCached(cacheKey("comments", "count"), async () => {
+    const rows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(comments)
+      .where(eq(comments.status, "published"));
+    return Number(rows[0]?.count ?? 0);
+  });
 }
 
 export async function updateComment(
@@ -291,6 +317,8 @@ export async function updateComment(
     if (existing.status === "published" && input.status !== "published")
       await bumpCount(existing.postType, existing.postId, -1);
   }
+  // 内容或状态变更都影响公开评论树，统一失效（状态未变也需刷新内容）。
+  bumpCommentCaches();
   return updated;
 }
 
@@ -299,6 +327,7 @@ export async function deleteComment(user: SessionUser, id: number): Promise<{ id
   const existing = await getComment(id);
   if (existing.status === "published") await bumpCount(existing.postType, existing.postId, -1);
   await db.delete(comments).where(eq(comments.id, id));
+  bumpCommentCaches();
   return { id };
 }
 
@@ -319,6 +348,7 @@ export async function setCommentsStatus(
       await bumpCount(existing.postType, existing.postId, -1);
     ok.push(id);
   }
+  bumpCommentCaches();
   return ok;
 }
 
@@ -332,5 +362,6 @@ export async function deleteComments(user: SessionUser, ids: number[]): Promise<
     await db.delete(comments).where(eq(comments.id, id));
     ok.push(id);
   }
+  bumpCommentCaches();
   return ok;
 }

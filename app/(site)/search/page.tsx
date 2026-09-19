@@ -2,6 +2,8 @@
 import { Search, ArrowLeft } from "lucide-react";
 import { listPosts } from "@/lib/services/posts";
 import { getActiveTheme } from "@/lib/services/themes";
+import { maintenanceGate } from "@/lib/services/maintenance";
+import MaintenanceScreen from "@/components/site/MaintenanceScreen";
 import PostCard from "@/components/shared/PostCard";
 import Sidebar from "@/components/shared/Sidebar";
 import { loadThemeModule } from "@/themes/registry";
@@ -14,6 +16,10 @@ export default async function SearchPage({
   searchParams: { q?: string };
 }) {
   const q = (searchParams.q ?? "").trim();
+
+  // 维护模式优先于主题搜索页委托，维护期间统一展示维护屏。
+  const maintenance = await maintenanceGate();
+  if (maintenance) return <MaintenanceScreen settings={maintenance} />;
 
   const theme = await getActiveTheme();
   const themeModule = await loadThemeModule(theme.slug);

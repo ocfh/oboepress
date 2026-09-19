@@ -1,10 +1,10 @@
-import { cache } from "react";
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { menus, menuItems, type MenuItem } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth";
 import { can } from "@/lib/rbac";
 import { ForbiddenError, NotFoundError } from "./errors";
+import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type MenuNode = {
   id: number;
@@ -61,9 +61,15 @@ function buildTree(flat: MenuItem[]): MenuNode[] {
   return roots;
 }
 
-/** 请求级去重（按 location）：主题 Layout 与各导航组件同请求内共享。
+/** 按 location 的公开菜单：跨请求短 TTL 缓存（自带同请求去重）。
  *  菜单写接口回读走 getMenu(id)，不经过这里，无读后写陈旧问题。 */
-export const getMenuByLocation = cache(async (location: string): Promise<MenuWithItems | null> => {
+export function getMenuByLocation(location: string): Promise<MenuWithItems | null> {
+  return publicCached(cacheKey("menus", `loc:${location}`), () =>
+    getMenuByLocationUncached(location),
+  );
+}
+
+async function getMenuByLocationUncached(location: string): Promise<MenuWithItems | null> {
   const [menu] = await db.select().from(menus).where(eq(menus.location, location));
   if (!menu) return null;
   const flat = await db
@@ -72,7 +78,7 @@ export const getMenuByLocation = cache(async (location: string): Promise<MenuWit
     .where(eq(menuItems.menuId, menu.id))
     .orderBy(asc(menuItems.order), asc(menuItems.id));
   return { id: menu.id, location: menu.location, name: menu.name, items: buildTree(flat) };
-});
+}
 
 export async function listMenus(): Promise<MenuWithItems[]> {
   const all = await db.select().from(menus).orderBy(asc(menus.id));
@@ -105,6 +111,7 @@ export async function createMenu(location: string, name: string): Promise<MenuWi
     .values({ location, name })
     .onConflictDoUpdate({ target: menus.location, set: { name } })
     .returning();
+  bump("menus");
   return { id: row.id, location: row.location, name: row.name, items: [] };
 }
 
@@ -143,17 +150,22 @@ export async function updateMenu(
     await db.update(menus).set({ updatedAt: new Date() }).where(eq(menus.id, id));
   }
 
-  return getMenu(id);
+  return getMenu(id).then((m) => {
+    bump("menus");
+    return m;
+  });
 }
 
 export async function deleteMenu(user: SessionUser, id: number): Promise<{ id: number }> {
   if (!can(user.role, "settings:manage")) throw new ForbiddenError();
   await db.delete(menus).where(eq(menus.id, id));
+  bump("menus");
   return { id };
 }
 
 /** Re-register a menu location (used by themes). No-op for the service layer. */
 export async function ensureMenuLocation(location: string, name: string): Promise<void> {
   await db.insert(menus).values({ location, name }).onConflictDoNothing({ target: menus.location });
+  bump("menus");
   void desc;
 }

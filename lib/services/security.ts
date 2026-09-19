@@ -24,6 +24,12 @@ export interface AdminSecurity {
   captchaMode: CaptchaMode;
   /** custom 模式的校验接口地址，返回 {ok:true} 视为通过。 */
   captchaVerifyUrl: string;
+  /** 登录失败限流：滑动窗口内连续失败达到阈值后临时拒绝登录。 */
+  throttleEnabled: boolean;
+  /** 窗口内允许的最大失败次数。 */
+  throttleMaxFailures: number;
+  /** 统计窗口（分钟），同时也是锁定时长（窗口滑过后自动解锁）。 */
+  throttleWindowMinutes: number;
 }
 
 const OPTION_KEY = "adminSecurity";
@@ -34,6 +40,9 @@ const DEFAULT_SECURITY: AdminSecurity = {
   captchaEnabled: false,
   captchaMode: "builtin",
   captchaVerifyUrl: "",
+  throttleEnabled: true,
+  throttleMaxFailures: 5,
+  throttleWindowMinutes: 15,
 };
 
 /** 入口首段不得占用的系统保留路径。 */
@@ -105,6 +114,13 @@ export const getAdminSecurity = cache(async (): Promise<AdminSecurity> => {
   return { ...DEFAULT_SECURITY, ...stored };
 });
 
+/** 数字设置项的容错合并：非数 / NaN 时保留现值，并夹取到允许区间。 */
+function clampInt(raw: unknown, fallback: number, min: number, max: number): number {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
+}
+
 /**
  * 规范化并校验入口路径：
  * 小写、去重斜杠/尾斜杠，仅允许字母数字 - _ /，1~3 段、总长 ≤ 64；
@@ -133,6 +149,22 @@ export async function saveAdminSecurity(
       typeof input.captchaVerifyUrl === "string"
         ? input.captchaVerifyUrl.trim()
         : current.captchaVerifyUrl,
+    throttleEnabled:
+      typeof input.throttleEnabled === "boolean"
+        ? input.throttleEnabled
+        : current.throttleEnabled,
+    throttleMaxFailures: clampInt(
+      input.throttleMaxFailures,
+      current.throttleMaxFailures,
+      3,
+      50,
+    ),
+    throttleWindowMinutes: clampInt(
+      input.throttleWindowMinutes,
+      current.throttleWindowMinutes,
+      1,
+      1440,
+    ),
   };
   // 内置模式不需要外部地址，清掉避免残留配置在切回 custom 时静默生效。
   if (next.captchaMode === "builtin") next.captchaVerifyUrl = "";

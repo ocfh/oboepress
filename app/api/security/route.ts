@@ -11,6 +11,9 @@ const securitySchema = z.object({
   captchaEnabled: z.boolean().optional(),
   captchaMode: z.enum(["builtin", "custom"]).optional(),
   captchaVerifyUrl: z.string().optional(),
+  throttleEnabled: z.boolean().optional(),
+  throttleMaxFailures: z.number().int().positive().optional(),
+  throttleWindowMinutes: z.number().int().positive().optional(),
 });
 
 export async function GET() {

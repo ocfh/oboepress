@@ -96,6 +96,46 @@ export async function setSessionCookie(user: SessionUser): Promise<void> {
 }
 
 /**
+ * Short-lived (10 min) ticket handed to the client between the two login
+ * steps: it proves "the password already passed for this user" but is NOT a
+ * session — verifyChallengeTicket() reloads the row so a banned/deleted user
+ * cannot finish the second step.
+ */
+export async function signChallengeTicket(user: SessionUser): Promise<string> {
+  return new SignJWT({ twofa: true })
+    .setProtectedHeader({ alg: "HS256" })
+    .setSubject(String(user.id))
+    .setIssuedAt()
+    .setExpirationTime("10m")
+    .sign(getSecret());
+}
+
+export async function verifyChallengeTicket(
+  token: string,
+): Promise<SessionUser | null> {
+  try {
+    const { payload } = await jwtVerify(token, getSecret());
+    if (payload.twofa !== true || !payload.sub) return null;
+    const id = Number(payload.sub);
+    if (!Number.isInteger(id)) return null;
+    await ensureMigrations();
+    const [row] = await db
+      .select({
+        status: users.status,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+      })
+      .from(users)
+      .where(eq(users.id, id));
+    if (!row || row.status !== "active") return null;
+    return { id, email: row.email, name: row.name, role: row.role };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Validate credentials, returning a session user or null. The identifier may
  * be an email (contains "@") or a unique nickname used by self-registered
  * members; both lookups are case-insensitive.

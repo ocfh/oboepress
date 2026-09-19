@@ -1,12 +1,27 @@
 import { cookies } from "next/headers";
 import { fail, ok, readJson, handleError } from "@/lib/http";
 import { loginSchema } from "@/lib/validation";
-import { verifyCredentials, setSessionCookie } from "@/lib/auth";
+import {
+  signChallengeTicket,
+  verifyCredentials,
+  setSessionCookie,
+} from "@/lib/auth";
 import { getAdminSecurity, isEntryReferer } from "@/lib/services/security";
 import { CAPTCHA_COOKIE, verifyLoginCaptcha } from "@/lib/services/captcha";
+import { ensurePluginsLoaded } from "@/lib/services/plugins";
+import { applyAsyncFilters, doAction, HOOKS } from "@/lib/hooks";
+import {
+  assertLoginAllowed,
+  clientIp,
+  clientUa,
+  recordSecurityEvent,
+  SECURITY_EVENTS,
+} from "@/lib/services/security-events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+type Challenge = { type: string } | null;
 
 export async function POST(req: Request) {
   const body = await readJson(req, loginSchema);
@@ -26,9 +41,58 @@ export async function POST(req: Request) {
     );
     if (captchaError) return fail(captchaError, 400);
 
-    const user = await verifyCredentials(body.data.account, body.data.password);
-    if (!user) return fail("账号或密码错误", 401);
+    // 失败限流：过了验证码才计数，避免机器人盲刷验证码产生噪声事件。
+    const ip = clientIp(req);
+    const ua = clientUa(req);
+    const { account, password } = body.data;
+    try {
+      await assertLoginAllowed(account, ip);
+    } catch (e) {
+      await recordSecurityEvent({
+        eventType: SECURITY_EVENTS.LOGIN_LOCKED,
+        account,
+        ip,
+        userAgent: ua,
+      });
+      throw e;
+    }
+
+    const user = await verifyCredentials(account, password);
+    if (!user) {
+      await recordSecurityEvent({
+        eventType: SECURITY_EVENTS.LOGIN_FAIL,
+        account,
+        ip,
+        userAgent: ua,
+      });
+      return fail("账号或密码错误", 401);
+    }
+
+    // 二步验证插件（如 two-factor）可在此拦截：密码正确也先不发票据会话，
+    // 改发 10 分钟挑战票据，由 /api/auth/login-2fa 完成动态码/恢复码校验。
+    await ensurePluginsLoaded();
+    const challenged = await applyAsyncFilters<{
+      user: typeof user;
+      challenge: Challenge;
+    }>(HOOKS.authChallenge, { user, challenge: null });
+    if (challenged.challenge) {
+      const ticket = await signChallengeTicket(user);
+      return ok({
+        twoFactorRequired: true,
+        challengeType: challenged.challenge.type,
+        ticket,
+      });
+    }
+
     await setSessionCookie(user);
+    await recordSecurityEvent({
+      eventType: SECURITY_EVENTS.LOGIN_SUCCESS,
+      userId: user.id,
+      account,
+      ip,
+      userAgent: ua,
+    });
+    doAction(HOOKS.userLoggedIn, { user });
     return ok({ user });
   } catch (e) {
     return handleError(e);

@@ -11,6 +11,8 @@ const memberSchema = z.object({
   emailRequired: z.boolean().optional(),
   phoneRequired: z.boolean().optional(),
   captchaEnabled: z.boolean().optional(),
+  inviteOnly: z.boolean().optional(),
+  inviteCodes: z.array(z.string().max(64)).max(200).optional(),
   defaultRole: z.enum(["subscriber", "author"]).optional(),
 });
 

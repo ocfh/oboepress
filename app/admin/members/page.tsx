@@ -19,6 +19,8 @@ type MemberCfg = {
   emailRequired: boolean;
   phoneRequired: boolean;
   captchaEnabled: boolean;
+  inviteOnly: boolean;
+  inviteCodes: string[];
   defaultRole: DefaultRole;
 };
 
@@ -233,6 +235,43 @@ export default function MembersAdmin() {
             onChange={(v) => setCfg({ ...cfg, captchaEnabled: v })}
           />
         </div>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-100">邀请码注册</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              开启后注册必须填写有效邀请码。在下方每行填写一个邀请码，
+              校验时忽略大小写；保存时自动去重。
+            </p>
+          </div>
+          <Toggle
+            checked={cfg.inviteOnly}
+            onChange={(v) => setCfg({ ...cfg, inviteOnly: v })}
+          />
+        </div>
+        {cfg.inviteOnly && (
+          <div className="mt-4">
+            <textarea
+              className={inputCls}
+              rows={6}
+              spellCheck={false}
+              value={cfg.inviteCodes.join("\n")}
+              onChange={(e) =>
+                setCfg({
+                  ...cfg,
+                  inviteCodes: e.target.value.split("\n"),
+                })
+              }
+              placeholder={"WELCOME-2026\nOBEO-PRESS"}
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              当前 {cfg.inviteCodes.map((c) => c.trim()).filter(Boolean).length} 个邀请码，
+              单个最长 64 个字符，最多 200 个。
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">

@@ -1,4 +1,3 @@
-import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -8,6 +7,7 @@ import {
   type FooterLink,
 } from "@/db/schema";
 import { ensureBootstrap } from "./bootstrap";
+import { publicCached, cacheKey, bumpAll } from "./public-cache";
 
 export type SiteSettingsInput = {
   // General
@@ -84,16 +84,18 @@ export type SiteSettingsInput = {
 };
 
 /**
- * 全站设置单行在一次公开渲染中会被 root layout、catch-all、主题 Layout、
- * Sidebar 等读取 4~6 次；React cache 把同请求内的重复查询合并为一条 SQL。
- * 写接口 updateSettings 直接返回更新后的行，不依赖读后写，故请求内缓存
- * 不会让后台保存响应拿到旧值。
+ * 全站设置单行：React 层同请求去重 + 跨请求短 TTL（公开渲染每请求读 4~6 次）。
+ * 写接口 updateSettings 主动 bumpAll（站点标题/主题/头像源等渗入几乎所有缓存产物）。
  */
-export const getSettings = cache(async (): Promise<SiteSettings> => {
+export function getSettings(): Promise<SiteSettings> {
+  return publicCached(cacheKey("settings", "row"), getSettingsUncached);
+}
+
+async function getSettingsUncached(): Promise<SiteSettings> {
   await ensureBootstrap();
   const [row] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1));
   return row!;
-});
+}
 
 /**
  * Patch the singleton settings row.
@@ -177,6 +179,8 @@ export async function updateSettings(
     })
     .where(eq(siteSettings.id, 1))
     .returning();
+  // 设置渗入所有公开缓存产物（站点标题、主题、头像源、分页条数等），全站失效。
+  bumpAll();
   return row!;
 }
 

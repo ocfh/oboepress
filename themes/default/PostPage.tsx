@@ -14,8 +14,8 @@ import {
 import Comments from "@/components/shared/CommentsLazy";
 import Sidebar from "@/components/shared/Sidebar";
 import Breadcrumb from "@/components/shared/Breadcrumb";
-import PostToc from "@/components/shared/PostToc";
-import ShareButtons from "@/components/shared/ShareButtons";
+import PostToc from "@/components/shared/PostTocLazy";
+import ShareButtons from "@/components/shared/ShareButtonsLazy";
 import RelatedPosts from "@/components/shared/RelatedPosts";
 import WidgetArea from "@/components/shared/WidgetArea";
 import { THEME_SLUG } from "@/themes/default";

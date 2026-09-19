@@ -4,9 +4,13 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { getAdminSecurity } from "@/lib/services/security";
+import { maintenanceGate } from "@/lib/services/maintenance";
+import MaintenanceScreen from "@/components/site/MaintenanceScreen";
 import { getPublicRegisterConfig } from "@/lib/services/members";
-import AdminLogin from "@/components/admin/AdminLogin";
-import RegisterForm, { type RegisterConfig } from "@/components/site/RegisterForm";
+import { getPublicProviders } from "@/lib/services/oauth";
+import OAuthButtons from "@/components/shared/OAuthButtons";
+import AdminLogin from "@/components/admin/AdminLoginLazy";
+import RegisterForm, { type RegisterConfig } from "@/components/site/RegisterFormLazy";
 import {
   resolveSitePath,
   getPermalinkConfig,
@@ -86,6 +90,9 @@ function seoTargetFor(res: SitePathResolution, cfg: PermalinkConfig): SeoTarget 
       return {
         kind: "category",
         title: res.category.name,
+        seoTitle: res.category.seoTitle,
+        seoDescription: res.category.seoDescription,
+        seoKeywords: res.category.seoKeywords,
         excerpt: res.category.description,
         url: categoryUrlFor(cfg, res.category),
       };
@@ -93,6 +100,9 @@ function seoTargetFor(res: SitePathResolution, cfg: PermalinkConfig): SeoTarget 
       return {
         kind: "tag",
         title: res.tag.name,
+        seoTitle: res.tag.seoTitle,
+        seoDescription: res.tag.seoDescription,
+        seoKeywords: res.tag.seoKeywords,
         url: tagUrlFor(cfg, res.tag),
       };
     case "blogIndex":
@@ -159,7 +169,10 @@ export default async function SiteCatchAll({ params, searchParams }: RouteProps)
       return <AdminLogin />;
     }
     if (registerCfg) {
-      const user = await getSession();
+      const [user, oauthProviders] = await Promise.all([
+        getSession(),
+        getPublicProviders(),
+      ]);
       if (user) redirect("/");
       return (
         <div className="flex justify-center py-12">
@@ -174,12 +187,17 @@ export default async function SiteCatchAll({ params, searchParams }: RouteProps)
               注册账号
             </h1>
             <RegisterForm config={registerCfg} />
+            <OAuthButtons providers={oauthProviders} variant="light" />
           </div>
         </div>
       );
     }
     notFound();
   }
+
+  // 维护模式：仅对实体内容路由生效；上面的秘密入口 / 注册页分支不受影响。
+  const maintenance = await maintenanceGate();
+  if (maintenance) return <MaintenanceScreen settings={maintenance} />;
 
   const theme = await getActiveTheme();
   const themeModule = (await loadThemeModule(theme.slug)) ?? (await loadThemeModule("default"));

@@ -22,6 +22,11 @@ import {
   UserPlus,
   UserRound,
   Bell,
+  Share2,
+  Construction,
+  FileQuestion,
+  ScrollText,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth";
@@ -44,9 +49,14 @@ const NAV: { href: string; label: string; exact?: boolean; icon: LucideIcon; adm
   { href: "/admin/settings", label: "设置", icon: Settings, superOnly: true },
   { href: "/admin/permalinks", label: "固定链接", icon: Link2, superOnly: true },
   { href: "/admin/security", label: "后台安全", icon: ShieldCheck, superOnly: true },
+  { href: "/admin/maintenance", label: "维护模式", icon: Construction, superOnly: true },
+  { href: "/admin/notfound", label: "404 页面", icon: FileQuestion, superOnly: true },
+  { href: "/admin/security-logs", label: "安全日志", icon: ScrollText, superOnly: true },
   { href: "/admin/members", label: "会员注册", icon: UserPlus, superOnly: true },
+  { href: "/admin/oauth", label: "第三方登录", icon: Share2, superOnly: true },
   { href: "/admin/notify", label: "通知验证码", icon: Bell, superOnly: true },
   { href: "/admin/users", label: "用户", icon: Users, superOnly: true },
+  { href: "/admin/export", label: "内容导出", icon: Download, superOnly: true },
 ];
 
 const STANDALONE = ["/admin/login", "/admin/setup"];

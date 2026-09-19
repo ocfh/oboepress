@@ -3,7 +3,15 @@ import { createSchema } from "graphql-yoga";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getSessionFromRequest, signSession, verifyCredentials } from "@/lib/auth";
+import {
+  getSessionFromRequest,
+  signChallengeTicket,
+  signSession,
+  verifyChallengeTicket,
+  verifyCredentials,
+} from "@/lib/auth";
+import { ensurePluginsLoaded } from "@/lib/services/plugins";
+import { applyAsyncFilters, HOOKS } from "@/lib/hooks";
 import type { SessionUser } from "@/lib/auth";
 import { ServiceError } from "@/lib/services/errors";
 import * as postSvc from "@/lib/services/posts";
@@ -217,6 +225,7 @@ const typeDefs = /* GraphQL */ `
 
   type Mutation {
     login(email: String!, password: String!): AuthPayload!
+    login2fa(ticket: String!, code: String!): AuthPayload!
     createPost(input: PostInput!): Post!
     updatePost(id: Int!, input: PostInput!): Post!
     deletePost(id: Int!): Boolean!
@@ -306,6 +315,44 @@ export const schema = createSchema<Ctx>({
       login: async (_p, { email, password }) => {
         const user = await verifyCredentials(email, password);
         if (!user) throw new GraphQLError("邮箱或密码错误", { extensions: { code: "UNAUTHENTICATED" } });
+        // 与 REST /api/auth/login 相同的二步挑战门控；需要二步时票据随
+        // 错误扩展返回，客户端改调 login2fa。
+        await ensurePluginsLoaded();
+        const challenged = await applyAsyncFilters<{
+          user: typeof user;
+          challenge: { type: string } | null;
+        }>(HOOKS.authChallenge, { user, challenge: null });
+        if (challenged.challenge) {
+          const ticket = await signChallengeTicket(user);
+          throw new GraphQLError("需要两步验证", {
+            extensions: {
+              code: "TWO_FACTOR_REQUIRED",
+              challengeType: challenged.challenge.type,
+              ticket,
+            },
+          });
+        }
+        const token = await signSession(user);
+        return { token, user };
+      },
+      login2fa: async (_p, { ticket, code }) => {
+        const user = await verifyChallengeTicket(ticket);
+        if (!user) {
+          throw new GraphQLError("验证已过期，请重新登录", {
+            extensions: { code: "UNAUTHENTICATED" },
+          });
+        }
+        await ensurePluginsLoaded();
+        const verdict = await applyAsyncFilters<{
+          user: typeof user;
+          code: string;
+          ok: boolean;
+        }>(HOOKS.authChallengeVerify, { user, code, ok: false });
+        if (!verdict.ok) {
+          throw new GraphQLError("动态码或恢复码不正确", {
+            extensions: { code: "UNAUTHENTICATED" },
+          });
+        }
         const token = await signSession(user);
         return { token, user };
       },

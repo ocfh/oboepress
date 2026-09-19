@@ -10,6 +10,7 @@ import { slugify, uniqueSlug, excerptFrom } from "@/lib/utils";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { getPermalinkConfig, pageUrlFor } from "./links";
 import { getPostMetas, setPostMetas } from "./metas";
+import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type PageQuery = {
   status?: string;
@@ -57,7 +58,18 @@ export async function listPages(opts: PageQuery = {}): Promise<{
   };
 }
 
-export async function getPageById(id: number, includeUnpublished = false): Promise<PageListItem> {
+export function getPageById(id: number, includeUnpublished = false): Promise<PageListItem> {
+  // 后台/预览读取旁路缓存，避免草稿状态被短 TTL 缓存挡住。
+  if (includeUnpublished) return getPageByIdUncached(id, true);
+  return publicCached(cacheKey("pages", `get:id:${id}`), () =>
+    getPageByIdUncached(id, false),
+  );
+}
+
+async function getPageByIdUncached(
+  id: number,
+  includeUnpublished: boolean,
+): Promise<PageListItem> {
   const [row] = await db.select().from(pages).where(eq(pages.id, id));
   if (!row) throw new NotFoundError("页面不存在");
   if (!includeUnpublished && row.status !== "published")
@@ -66,9 +78,19 @@ export async function getPageById(id: number, includeUnpublished = false): Promi
   return { ...row, url: pageUrlFor(cfg, row), metas };
 }
 
-export async function getPageBySlug(
+export function getPageBySlug(
   slug: string,
   includeUnpublished = false,
+): Promise<PageListItem> {
+  if (includeUnpublished) return getPageBySlugUncached(slug, true);
+  return publicCached(cacheKey("pages", `get:slug:${slug}`), () =>
+    getPageBySlugUncached(slug, false),
+  );
+}
+
+async function getPageBySlugUncached(
+  slug: string,
+  includeUnpublished: boolean,
 ): Promise<PageListItem> {
   const [row] = await db.select().from(pages).where(eq(pages.slug, slug));
   if (!row) throw new NotFoundError("页面不存在");
@@ -109,6 +131,8 @@ export async function createPage(user: SessionUser, input: PageInput): Promise<P
     })
     .returning();
   if (input.metas) await setPostMetas(page.id, input.metas);
+  bump("pages");
+  bump("widgets");
   return getPageById(page.id, true);
 }
 
@@ -164,6 +188,8 @@ export async function updatePage(
     .where(eq(pages.id, id));
 
   if (input.metas) await setPostMetas(id, input.metas);
+  bump("pages");
+  bump("widgets");
   return getPageById(id, true);
 }
 
@@ -171,6 +197,8 @@ export async function deletePage(user: SessionUser, id: number): Promise<{ id: n
   if (!can(user.role, "content:update:any"))
     throw new ForbiddenError("仅编辑/管理员可管理页面");
   await db.delete(pages).where(eq(pages.id, id));
+  bump("pages");
+  bump("widgets");
   return { id };
 }
 

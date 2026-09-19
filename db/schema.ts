@@ -131,6 +131,32 @@ export const verifyCodes = pgTable(
   (t) => ({ targetIdx: index("verify_codes_target_idx").on(t.target, t.purpose) }),
 );
 
+/**
+ * 安全事件流水：登录成功/失败、锁定、2FA、找回密码等。
+ * 同时作为「登录失败限流」的计数来源与后台「安全日志」的展示数据源。
+ * detail 存放事件特有字段（账号名、原因、失败次数等），不加外键约束，
+ * 这样即使用户被删除，历史事件仍可保留审计。
+ */
+export const securityEvents = pgTable(
+  "security_events",
+  {
+    id: serial("id").primaryKey(),
+    // login.success | login.fail | login.locked | password.reset | maintenance …
+    eventType: text("event_type").notNull(),
+    userId: integer("user_id"),
+    // 登录表单里填写的账号（用户可能不存在，故与 userId 分开存）。
+    account: text("account"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    detail: jsonb("detail").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    typeIdx: index("security_events_type_idx").on(t.eventType, t.createdAt),
+    accountIdx: index("security_events_account_idx").on(t.account, t.createdAt),
+  }),
+);
+
 // Reusable content columns shared by posts and pages.
 const contentColumns = {
   title: text("title").notNull(),
@@ -173,6 +199,8 @@ export const posts = pgTable(
     formatMeta: jsonb("format_meta").$type<Record<string, string>>().notNull().default({}),
     // Total likes (incremented by the public post-like action).
     likes: integer("likes").notNull().default(0),
+    // 独立访客数（UV）：与每次刷新都 +1 的 views(PV) 区分，按访客去重计数。
+    uniqueViews: integer("unique_views").notNull().default(0),
     // --- M2 configurable permalinks ---
     // Persisted pinyin / initials tails so /blog/ni-hao-shijie reverses to a
     // post via an indexed lookup. Populated on create/update; NULL only for
@@ -187,6 +215,22 @@ export const posts = pgTable(
     pinyinIdx: uniqueIndex("posts_pinyin_slug_idx").on(t.pinyinSlug),
     initialIdx: uniqueIndex("posts_initial_slug_idx").on(t.initialSlug),
   }),
+);
+
+/**
+ * 文章 UV 去重表：同一访客键每篇文章只落一行，插入成功才给 unique_views +1。
+ * 访客键只存 IP+UA 的 SHA-256 哈希，不落原始信息。
+ */
+export const postVisitors = pgTable(
+  "post_visitors",
+  {
+    postId: integer("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    visitorKey: text("visitor_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: uniqueIndex("post_visitors_pk").on(t.postId, t.visitorKey) }),
 );
 
 export const pages = pgTable(
@@ -241,6 +285,10 @@ export const categories = pgTable(
     parentId: integer("parent_id"),
     // Manual sort position within the same parent; used by drag-to-reorder.
     order: integer("order").notNull().default(0),
+    // 分类页独立 SEO 三项；留空时前台回退到描述/站点默认。
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    seoKeywords: text("seo_keywords"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ slugIdx: uniqueIndex("categories_slug_idx").on(t.slug) }),
@@ -252,6 +300,10 @@ export const tags = pgTable(
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    // 标签归档页独立 SEO 三项；留空时前台回退到站点默认。
+    seoTitle: text("seo_title"),
+    seoDescription: text("seo_description"),
+    seoKeywords: text("seo_keywords"),
   },
   (t) => ({ slugIdx: uniqueIndex("tags_slug_idx").on(t.slug) }),
 );
@@ -361,6 +413,8 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type OauthIdentity = typeof oauthIdentities.$inferSelect;
 export type VerifyCode = typeof verifyCodes.$inferSelect;
+export type SecurityEvent = typeof securityEvents.$inferSelect;
+export type PostVisitor = typeof postVisitors.$inferInsert;
 export type Post = typeof posts.$inferSelect;
 export type Page = typeof pages.$inferSelect;
 export type Media = typeof media.$inferSelect;

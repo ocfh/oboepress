@@ -4,6 +4,7 @@ import { pinyinSlug } from "@/lib/pinyin";
 import type { PostListItem } from "./posts";
 import type { PageListItem } from "./pages";
 import type { Category, Tag } from "@/db/schema";
+import { bumpAll } from "./public-cache";
 
 /**
  * Single gateway for every public URL on the site.
@@ -93,6 +94,8 @@ export async function savePermalinkConfig(input: Partial<PermalinkConfig>): Prom
     const { backfillPostLinkSlugs } = await import("./posts");
     await backfillPostLinkSlugs();
   }
+  // 链接形式变化会改写全站所有 URL（缓存产物内嵌 url），回填完成后再全站失效。
+  bumpAll();
   return cfg;
 }
 

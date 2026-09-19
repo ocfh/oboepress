@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { User, Mail, Smartphone, Lock, ShieldCheck, Loader2, ArrowLeft } from "lucide-react";
+import { User, Mail, Smartphone, Lock, ShieldCheck, Loader2, ArrowLeft, KeyRound } from "lucide-react";
 
 /**
  * 前台会员注册表单。渲染在 catch-all 的注册路径上（外壳为活动主题的公开
@@ -18,6 +18,7 @@ export type RegisterConfig = {
   emailVerify: boolean;
   phoneVerify: boolean;
   defaultRole: "subscriber" | "author";
+  inviteOnly: boolean;
   captcha: { enabled: boolean; mode: "builtin" | "custom" | null };
 };
 
@@ -80,6 +81,7 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
   const [emailCode, setEmailCode] = useState("");
   const [phoneCode, setPhoneCode] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [captcha, setCaptcha] = useState("");
   const [imgNonce, setImgNonce] = useState(() => Date.now());
   const [error, setError] = useState("");
@@ -165,6 +167,10 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
       setError("请填写手机验证码");
       return;
     }
+    if (config.inviteOnly && !inviteCode.trim()) {
+      setError("请填写邀请码");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register", {
@@ -175,6 +181,7 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
           ...(email.trim() ? { email: email.trim() } : {}),
           ...(phone.trim() ? { phone: phone.trim() } : {}),
           password,
+          ...(config.inviteOnly ? { inviteCode: inviteCode.trim() } : {}),
           ...(config.emailVerify && email.trim()
             ? { emailCode: emailCode.trim() }
             : {}),
@@ -274,6 +281,27 @@ export default function RegisterForm({ config }: { config: RegisterConfig }) {
           />
         )}
       </div>
+
+      {config.inviteOnly && (
+        <div>
+          <label className={labelCls} style={{ color: "var(--text-color-2)" }}>
+            <KeyRound size={15} style={{ color: "var(--text-color-3)" }} />
+            邀请码
+          </label>
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            maxLength={64}
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="请输入管理员发放的邀请码"
+            className={`${inputCls} tracking-wide`}
+            style={{ borderColor: "var(--border-color)" }}
+            required
+          />
+        </div>
+      )}
 
       <div>
         <label className={labelCls} style={{ color: "var(--text-color-2)" }}>

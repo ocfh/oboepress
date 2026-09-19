@@ -1,4 +1,3 @@
-import { cache } from "react";
 import { desc, eq } from "drizzle-orm";
 import fs from "node:fs";
 import path from "node:path";
@@ -17,6 +16,7 @@ import {
 } from "@/themes/registry";
 import { ensureBootstrap } from "./bootstrap";
 import { NotFoundError, ValidationError } from "./errors";
+import { publicCached, cacheKey, bump, bumpAll } from "./public-cache";
 
 export type ThemeInput = {
   name: string;
@@ -86,7 +86,11 @@ export async function getThemeBySlug(slug: string): Promise<Theme | null> {
  * 管理动作（list/create/delete）时跑，绝不在每个公开请求里对每个主题
  * 执行 upsert——那曾是单次首页渲染几十条无谓 SQL 的主要来源。
  */
-export const getActiveTheme = cache(async (): Promise<Theme> => {
+export function getActiveTheme(): Promise<Theme> {
+  return publicCached(cacheKey("theme", "active"), getActiveThemeUncached);
+}
+
+async function getActiveThemeUncached(): Promise<Theme> {
   await ensureBootstrap();
   const [settings] = await db
     .select()
@@ -112,7 +116,7 @@ export const getActiveTheme = cache(async (): Promise<Theme> => {
   const [anyTheme] = await db.select().from(themes).limit(1);
   if (anyTheme) return anyTheme;
   throw new NotFoundError("没有可用主题");
-});
+}
 
 export async function getThemeById(id: number): Promise<Theme> {
   const [row] = await db.select().from(themes).where(eq(themes.id, id));
@@ -140,6 +144,7 @@ export async function createTheme(input: ThemeInput): Promise<Theme> {
   invalidateThemeDiscovery();
   await syncThemes();
   const [row] = await db.select().from(themes).where(eq(themes.slug, slug));
+  bump("theme");
   return row!;
 }
 
@@ -223,6 +228,7 @@ export async function updateTheme(
     })
     .where(eq(themes.id, id))
     .returning();
+  bump("theme");
   return row;
 }
 
@@ -254,6 +260,8 @@ export async function deleteTheme(id: number): Promise<{ id: number }> {
   // 文件夹已删：丢弃清单缓存，后续扫描不再找回该主题。
   invalidateThemeDiscovery();
   await db.delete(themes).where(eq(themes.id, id));
+  // 可能连带改了 siteSettings 的 activeThemeSlug，整站缓存清空最稳妥。
+  bumpAll();
   return { id };
 }
 
@@ -264,6 +272,8 @@ export async function setActiveTheme(id: number): Promise<Theme> {
     .update(siteSettings)
     .set({ activeThemeSlug: theme.slug, updatedAt: new Date() })
     .where(eq(siteSettings.id, 1));
+  // 直接写了 siteSettings 行，getSettings 与全部主题渲染缓存都需失效。
+  bumpAll();
   return theme;
 }
 
@@ -367,6 +377,7 @@ export async function updateThemePanel(
     })
     .where(eq(themes.id, theme.id))
     .returning();
+  bump("theme");
   return row;
 }
 
@@ -385,6 +396,7 @@ export async function resetThemePanel(idOrSlug: string | number): Promise<Theme>
     })
     .where(eq(themes.id, theme.id))
     .returning();
+  bump("theme");
   return row;
 }
 
@@ -394,10 +406,14 @@ export async function resetThemePanel(idOrSlug: string | number): Promise<Theme>
  * 请求级去重：bluemix 的 Layout/HomePage/CatNav/Sidebar 每请求各调一次，
  * 底层的 schema 解析无需重复跑。
  */
-export const getActiveThemeSettings = cache(async (): Promise<Record<string, unknown>> => {
+export function getActiveThemeSettings(): Promise<Record<string, unknown>> {
+  return publicCached(cacheKey("theme", "active-settings"), getActiveThemeSettingsUncached);
+}
+
+async function getActiveThemeSettingsUncached(): Promise<Record<string, unknown>> {
   const theme = await getActiveTheme();
   return resolveSettings(getThemeSettingsSchema(theme.slug), theme.settings);
-});
+}
 
 /** A specific (non-active) theme's resolved settings — used by the shared engine. */
 export async function getThemeSettings(slug: string): Promise<Record<string, unknown>> {

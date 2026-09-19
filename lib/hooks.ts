@@ -184,6 +184,19 @@ export const HOOKS = {
   /** action — ({ user }) fired after a successful login */
   userLoggedIn: "user.logged-in",
   /**
+   * async filter — ({ user, challenge }) run after the password passes but
+   * before the session cookie is issued. A second-factor plugin sets
+   * `challenge` (e.g. { type: "totp" }); core then hands the client a
+   * short-lived ticket and waits for auth.challenge.verify.
+   */
+  authChallenge: "auth.challenge",
+  /**
+   * async filter — ({ user, code, ok }) verifies the second-factor code.
+   * A plugin sets `ok: true` when the code matches; it owns consumption of
+   * one-time recovery codes itself.
+   */
+  authChallengeVerify: "auth.challenge.verify",
+  /**
    * filter — ({ query, ids }) contribute ordered "floating" (sticky) post ids.
    * Core floats them above date/views ordering on the first page of every
    * public list, validates them against the archive's own filters, and

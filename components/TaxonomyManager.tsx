@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Folder, Tags, Plus, Trash2, GripVertical } from "lucide-react";
+import { Folder, Tags, Plus, Trash2, GripVertical, Pencil, X } from "lucide-react";
 import IconPicker from "@/components/admin/IconPicker";
 import IconGlyph from "@/components/IconGlyph";
 
@@ -13,7 +13,25 @@ type Item = {
   icon?: string | null;
   parentId: number | null;
   order: number;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  seoKeywords?: string | null;
 };
+
+/** 编辑弹窗的工作副本（所有文本均受控，null 统一成空串）。 */
+type EditForm = {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  icon: string | null;
+  seoTitle: string;
+  seoDescription: string;
+  seoKeywords: string;
+};
+
+const inputCls =
+  "w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500";
 
 /** Group the flat list into parent rows followed by their indented children. */
 function groupRows(its: Item[]): Item[] {
@@ -54,6 +72,8 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
   const [newIcon, setNewIcon] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [dragId, setDragId] = useState<number | null>(null);
+  const [editing, setEditing] = useState<EditForm | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const isCategory = type === "category";
   const endpoint = isCategory ? "/api/categories" : "/api/tags";
@@ -118,6 +138,53 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
       const d = await res.json().catch(() => ({}));
       setMsg((d as { error?: string }).error || "图标保存失败");
       load();
+    }
+  }
+
+  /** 打开编辑弹窗：把行数据拷成受控表单（含 SEO 三项）。 */
+  function openEdit(it: Item) {
+    setMsg("");
+    setEditing({
+      id: it.id,
+      name: it.name,
+      slug: it.slug,
+      description: it.description ?? "",
+      icon: it.icon ?? null,
+      seoTitle: it.seoTitle ?? "",
+      seoDescription: it.seoDescription ?? "",
+      seoKeywords: it.seoKeywords ?? "",
+    });
+  }
+
+  /** PATCH 保存编辑弹窗；空串以 null 提交，由服务端清空对应列。 */
+  async function saveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editing) return;
+    setSaving(true);
+    const payload: Record<string, unknown> = {
+      name: editing.name,
+      slug: editing.slug,
+      seoTitle: editing.seoTitle || null,
+      seoDescription: editing.seoDescription || null,
+      seoKeywords: editing.seoKeywords || null,
+    };
+    if (isCategory) {
+      payload.description = editing.description || null;
+      payload.icon = editing.icon;
+    }
+    const res = await fetch(`${endpoint}/${editing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    setSaving(false);
+    if (res.ok) {
+      setEditing(null);
+      setMsg("已保存 ✓");
+      load();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setMsg((d as { error?: string }).error || "保存失败");
     }
   }
 
@@ -301,6 +368,14 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
                       </span>
                     )}
                     <button
+                      onClick={() => openEdit(it)}
+                      className="mr-2 inline-flex items-center gap-1 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+                      title="编辑名称 / 描述 / SEO"
+                    >
+                      <Pencil size={14} />
+                      编辑
+                    </button>
+                    <button
                       onClick={() => remove(it.id)}
                       className="inline-flex items-center gap-1 rounded border border-red-900 px-2 py-1 text-xs text-red-400 hover:bg-red-950"
                       title="删除"
@@ -325,6 +400,138 @@ export default function TaxonomyManager({ type }: { type: "category" | "tag" }) 
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => !saving && setEditing(null)}
+        >
+          <form
+            onSubmit={saveEdit}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900 p-6"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">
+                编辑{title}：{editing.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => !saving && setEditing(null)}
+                className="text-zinc-500 hover:text-zinc-200"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 text-sm text-zinc-300">名称</p>
+                <input
+                  value={editing.name}
+                  onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                  required
+                  maxLength={100}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <p className="mb-1 text-sm text-zinc-300">别名（留空保存则保持现有别名）</p>
+                <input
+                  value={editing.slug}
+                  onChange={(e) => setEditing({ ...editing, slug: e.target.value })}
+                  maxLength={120}
+                  className={inputCls}
+                />
+              </div>
+              {isCategory && (
+                <>
+                  <div>
+                    <p className="mb-1 text-sm text-zinc-300">描述</p>
+                    <textarea
+                      value={editing.description}
+                      onChange={(e) =>
+                        setEditing({ ...editing, description: e.target.value })
+                      }
+                      rows={2}
+                      maxLength={500}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-sm text-zinc-300">图标</p>
+                    <IconPicker
+                      value={editing.icon}
+                      onChange={(v) => setEditing({ ...editing, icon: v })}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="rounded border border-zinc-800 bg-zinc-950/50 p-3">
+                <p className="mb-3 text-sm font-medium text-zinc-300">
+                  SEO 设置（留空则回退到{isCategory ? "描述" : "站点默认"}）
+                </p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="mb-1 text-xs text-zinc-400">SEO 标题</p>
+                    <input
+                      value={editing.seoTitle}
+                      onChange={(e) =>
+                        setEditing({ ...editing, seoTitle: e.target.value })
+                      }
+                      maxLength={200}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs text-zinc-400">SEO 描述</p>
+                    <textarea
+                      value={editing.seoDescription}
+                      onChange={(e) =>
+                        setEditing({ ...editing, seoDescription: e.target.value })
+                      }
+                      rows={2}
+                      maxLength={300}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-1 text-xs text-zinc-400">关键词（逗号分隔）</p>
+                    <input
+                      value={editing.seoKeywords}
+                      onChange={(e) =>
+                        setEditing({ ...editing, seoKeywords: e.target.value })
+                      }
+                      maxLength={500}
+                      placeholder="例如：博客, 设计, 前端"
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              {msg && <span className="text-sm text-emerald-400">{msg}</span>}
+              <button
+                type="button"
+                onClick={() => setEditing(null)}
+                className="rounded border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                取消
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {saving ? "保存中…" : "保存"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

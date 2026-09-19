@@ -202,12 +202,46 @@ export function getThemeTemplates(
 }
 
 /**
+ * 内置主题的显式加载表。
+ *
+ * 不能图省事写成 `import(`@/themes/${slug}/index`)`：全动态模板会让 webpack
+ * 生成一个囊括所有主题目录的 context 单块，把六个主题的导航/轮播/分享等客户端
+ * 代码合并进同一个 chunk。前台 SSR 只要渲染任意一个主题（bluemix），访客就会
+ * 把 skyscraper/codeman 等其余主题的代码一并下载（实测 57.6KB 的主题块里约
+ * 一半是别主题的白下发）。显式映射让每个主题各自成块，仅当前启用主题会被
+ * 加载；真正共用的工具仍由 splitChunks 自动提取为小公共块。
+ *
+ * 键用 manifest.slug（运行时实际传入值）。scottstudio-thyuu 的目录名是历史
+ * 遗留的 oboepress-2032，两个键都指向该目录。
+ */
+// 模块值保持 any：与原全动态 import 的推导结果一致，各主题 index 还允许导出
+// manifest.settingsSchema 的兼容形态（{ sections: [...] }），不在这里做严格收窄。
+const THEME_LOADERS: Record<string, () => Promise<any>> = {
+  bluemix: () => import("@/themes/bluemix"),
+  codeman: () => import("@/themes/codeman"),
+  default: () => import("@/themes/default"),
+  pseudolinear: () => import("@/themes/pseudolinear"),
+  skyscraper: () => import("@/themes/skyscraper"),
+  "scottstudio-thyuu": () => import("@/themes/oboepress-2032"),
+  "oboepress-2032": () => import("@/themes/oboepress-2032"),
+};
+
+/**
  * Dynamically import a theme module by slug.
  * Returns null if the theme doesn't exist or can't be loaded.
  */
 export async function loadThemeModule(slug: string): Promise<ThemeModule | null> {
   try {
-    const mod = await import(`@/themes/${slug}/index`);
+    // 只允许显式映射表内的主题。这里绝不能再留 `import(`@/themes/${slug}/index`)`
+    // 形式的兜底：只要同文件存在全动态模板，webpack 就会生成覆盖整个 themes/
+    // 目录的 context 模块，六个主题的客户端代码被合进同一个 chunk，上面的显式
+    // 映射会被完全抵消（实测 chunk 哈希一字节不变）。
+    // 后台「新建主题」只是把内置模板复制成 .tsx 源文件；生产构建后新目录既不在
+    // webpack context 内也没有编译产物，即便保留动态 import 在生产环境同样加载
+    // 失败。自定义主题需要随源码一起构建，届时在此表补一行即可。
+    const loader = THEME_LOADERS[slug];
+    if (!loader) return null;
+    const mod = await loader();
     const manifest = getThemeManifest(slug);
     if (!manifest) return null;
 

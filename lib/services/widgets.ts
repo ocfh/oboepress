@@ -23,6 +23,7 @@ import {
   tagUrlFor,
   type PermalinkConfig,
 } from "./links";
+import { publicCached, cacheKey, bump } from "./public-cache";
 
 export type WidgetInput = {
   area: string;
@@ -76,6 +77,7 @@ export async function createWidget(input: WidgetInput): Promise<Widget> {
       themeSlug: input.themeSlug ?? "",
     })
     .returning();
+  bump("widgets");
   return row;
 }
 
@@ -97,12 +99,14 @@ export async function updateWidget(
     })
     .where(eq(widgets.id, id))
     .returning();
+  bump("widgets");
   return row;
 }
 
 export async function deleteWidget(id: number): Promise<{ id: number }> {
   await ensureBootstrap();
   await db.delete(widgets).where(eq(widgets.id, id));
+  bump("widgets");
   return { id };
 }
 
@@ -112,6 +116,7 @@ export async function reorderWidgets(ids: number[]): Promise<void> {
   for (let i = 0; i < ids.length; i++) {
     await db.update(widgets).set({ order: i + 1 }).where(eq(widgets.id, ids[i]));
   }
+  bump("widgets");
 }
 
 /* -------------------------------------------------------------------------- */
@@ -126,8 +131,15 @@ export type ResolvedWidget = {
   data: unknown;
 };
 
-/** Load every enabled widget in an area, with its data already fetched. */
-export async function getAreaWidgets(
+/** Load every enabled widget in an area, with its data already fetched.
+ *  整组解析结果跨请求短 TTL 缓存（含每个小工具的数据查询），写小工具或内容变更时主动失效。 */
+export function getAreaWidgets(themeSlug: string, area: string): Promise<ResolvedWidget[]> {
+  return publicCached(cacheKey("widgets", `area:${themeSlug}:${area}`), () =>
+    getAreaWidgetsUncached(themeSlug, area),
+  );
+}
+
+async function getAreaWidgetsUncached(
   themeSlug: string,
   area: string,
 ): Promise<ResolvedWidget[]> {

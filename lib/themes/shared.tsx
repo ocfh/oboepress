@@ -14,8 +14,8 @@ import NavTree from "@/components/shared/NavTree";
 import Sidebar from "@/components/shared/Sidebar";
 import PostCard from "@/components/shared/PostCard";
 import Breadcrumb from "@/components/shared/Breadcrumb";
-import PostToc from "@/components/shared/PostToc";
-import ShareButtons from "@/components/shared/ShareButtons";
+import PostToc from "@/components/shared/PostTocLazy";
+import ShareButtons from "@/components/shared/ShareButtonsLazy";
 import RelatedPosts from "@/components/shared/RelatedPosts";
 // 评论仅文章页渲染：经客户端懒边界 CommentsLazy 切成独立 chunk，
 // 首页/列表页不下载（RSC 直接 dynamic 保留 SSR 会被合入路由共享块）。

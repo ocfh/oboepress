@@ -107,17 +107,26 @@ export const categoryIconSchema = z.preprocess(
     .optional(),
 );
 
+/** 分类/标签共用的 SEO 三项；空串与 null 都表示清除（service 层归一为 null）。 */
+const taxonomySeoShape = {
+  seoTitle: z.string().max(200).nullable().optional(),
+  seoDescription: z.string().max(300).nullable().optional(),
+  seoKeywords: z.string().max(500).nullable().optional(),
+};
+
 export const categoryInputSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().max(120).optional(),
   description: z.string().max(500).optional(),
   parentId: z.number().int().positive().optional(),
   icon: categoryIconSchema,
+  ...taxonomySeoShape,
 });
 
 export const tagInputSchema = z.object({
   name: z.string().min(1).max(100),
   slug: z.string().max(120).optional(),
+  ...taxonomySeoShape,
 });
 
 export const categoryReorderItemSchema = z.object({
@@ -156,6 +165,8 @@ export const registerSchema = z.object({
   phone: z.string().trim().max(20).optional(),
   password: z.string().min(8).max(200),
   captcha: z.string().trim().max(200).optional(),
+  // 邀请码，是否必需由服务端会员设置（inviteOnly）决定。
+  inviteCode: z.string().trim().max(64).optional(),
   // 邮箱 / 手机验证码（6 位），是否必需由服务端通知设置决定。
   emailCode: z.string().trim().max(8).optional(),
   phoneCode: z.string().trim().max(8).optional(),
@@ -169,9 +180,46 @@ export const sendCodeSchema = z.object({
 
 /** A logged-in user changing their own password (requires current password). */
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
+  // 纯第三方登录用户没有旧密码，服务层对 nopassword 用户放行空串。
+  currentPassword: z.string(),
   newPassword: z.string().min(8).max(200),
 });
+
+/** 找回密码第一步：提交账号（邮箱或昵称），向该账号绑定的邮箱发送重置码。 */
+export const forgotPasswordSchema = z.object({
+  account: z.string().trim().min(1).max(200),
+  captcha: z.string().trim().max(200).optional(),
+});
+
+/** 找回密码第二步：账号 + 邮箱验证码 + 新密码。 */
+export const resetPasswordSchema = z.object({
+  account: z.string().trim().min(1).max(200),
+  code: z.string().trim().min(4).max(8),
+  password: z.string().min(8).max(200),
+});
+
+/** 登录第二步：用密码通过后换来的短时票据 + TOTP 动态码/恢复码。 */
+export const loginTwoFaSchema = z.object({
+  ticket: z.string().min(10).max(2000),
+  code: z.string().trim().min(6).max(20),
+});
+
+/** 我的账号 → 两步验证自助操作。 */
+export const twoFaActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("begin") }),
+  z.object({
+    action: z.literal("confirm"),
+    code: z.string().trim().min(6).max(20),
+  }),
+  z.object({
+    action: z.literal("regen"),
+    code: z.string().trim().min(6).max(20),
+  }),
+  z.object({
+    action: z.literal("disable"),
+    password: z.string().min(1).max(200),
+  }),
+]);
 
 /** A logged-in user editing their own display name + email. */
 export const profileSchema = z.object({
