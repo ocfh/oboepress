@@ -14,6 +14,7 @@ import {
 import { SectionFields } from "@/components/SettingsFields";
 import type { SettingsSchema } from "@/lib/settings-schema";
 import { themeToVars } from "@/lib/theme";
+import { getPalettePreset } from "@/lib/theme-palettes";
 import type { ThemeConfig } from "@/db/schema";
 
 /**
@@ -59,6 +60,8 @@ export default function ThemeSettingsForm(props: Props) {
   const section = all.find((s) => s.key === active) ?? all[0];
 
   // Live preview swatch: only the token keys are meaningful as CSS vars.
+  // The theme's 配色方案 is layered underneath so picking a palette repaints
+  // the preview instantly, exactly like the public site does.
   const previewVars = useMemo(() => {
     const cfg: Record<string, string> = {};
     for (const s of props.appearanceSchema) {
@@ -67,7 +70,14 @@ export default function ThemeSettingsForm(props: Props) {
         if (typeof v === "string" && v.trim()) cfg[f.key] = v;
       }
     }
-    return themeToVars(cfg as ThemeConfig);
+    const paletteKey = typeof draft.palette === "string" ? draft.palette : undefined;
+    const preset = getPalettePreset(paletteKey);
+    // Preset first, explicit token edits second — the user's per-token
+    // tweaks must win over the palette they started from.
+    const merged = preset
+      ? ({ ...preset.tokens, ...cfg } as ThemeConfig)
+      : (cfg as ThemeConfig);
+    return themeToVars(merged);
   }, [draft, props.appearanceSchema]);
 
   function set(key: string, value: unknown) {

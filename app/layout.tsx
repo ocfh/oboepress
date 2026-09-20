@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import "./globals.css";
 import { getSettings } from "@/lib/services/settings";
-import { getActiveTheme } from "@/lib/services/themes";
+import { getActiveTheme, getActiveThemeRenderConfig } from "@/lib/services/themes";
 import { themeToCss } from "@/lib/theme";
 import { loadThemeModule } from "@/themes/registry";
 import { buildFooterHtml } from "@/lib/services/render";
@@ -71,11 +71,12 @@ export default async function RootLayout({
   }
 
   // Public routes: load active theme and inject CSS variables.
-  const [settings, theme] = await Promise.all([
+  const [settings, theme, renderConfig] = await Promise.all([
     getSettings(),
     getActiveTheme(),
+    getActiveThemeRenderConfig(),
   ]);
-  const css = themeToCss(theme.config);
+  const css = themeToCss(renderConfig);
   const themeModule =
     (await loadThemeModule(theme.slug)) ??
     (await loadThemeModule("default"));

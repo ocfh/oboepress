@@ -108,7 +108,7 @@ export interface ThemeModule {
    *  default OboePress markup. */
   BlogListPage?: React.ComponentType<{ page: number }>;
   CategoryPage?: React.ComponentType<{ slug: string }>;
-  SearchPage?: React.ComponentType<{ q: string; page?: number }>;
+  SearchPage?: React.ComponentType<{ q: string; page?: number; all?: boolean }>;
   /** Optional theme-branded 404 screen; falls back to the shared one. */
   NotFoundPage?: React.ComponentType<{ settings: NotFoundSettings }>;
 }

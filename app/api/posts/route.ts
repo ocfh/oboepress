@@ -15,6 +15,9 @@ export async function GET(req: Request) {
     authorId: q.get("authorId") ? Number(q.get("authorId")) : undefined,
     categoryId: q.get("categoryId") ? Number(q.get("categoryId")) : undefined,
     tagId: q.get("tagId") ? Number(q.get("tagId")) : undefined,
+    // 关键词搜索：前台搜索弹窗用它判定「是否唯一命中」，
+    // 命中数=1 时直接跳文章、不展示搜索结果页。
+    search: q.get("search")?.trim() || undefined,
     limit: q.get("limit") ? Number(q.get("limit")) : 20,
     offset: q.get("offset") ? Number(q.get("offset")) : 0,
   };

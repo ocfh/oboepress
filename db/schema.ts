@@ -689,6 +689,13 @@ export type ThemeConfig = {
   /** CSS gradient used for hero / accents. */
   gradient?: string;
 
+  /**
+   * "dark" | "light" — emitted as the real `color-scheme` declaration so the
+   * browser's native UI (scrollbars, form controls) matches the palette.
+   * Set automatically by 配色方案 presets; manual themes can override.
+   */
+  colorScheme?: string;
+
   // --- Escape hatch ---
   customCss?: string;
 };

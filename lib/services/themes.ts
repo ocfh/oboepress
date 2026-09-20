@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { siteSettings, themes, type Theme, type ThemeConfig } from "@/db/schema";
 import { coerceSettings, resolveSettings, type SettingsSchema } from "@/lib/settings-schema";
 import { DEFAULT_THEME_CONFIG, resolveThemeConfig } from "@/lib/theme";
+import { applyPalette, isPaletteSupplied } from "@/lib/theme-palettes";
 import { THEME_CONFIG_KEYS, THEME_CONFIG_SCHEMA } from "@/lib/theme-schema";
 import {
   discoverThemes,
@@ -367,6 +368,11 @@ export async function getThemePanel(idOrSlug: string | number): Promise<ThemePan
  * everything else is coerced against the theme's own schema and stored in
  * `themes.settings`. Unknown keys are dropped, so a stale browser tab can never
  * write junk into the row.
+ *
+ * Palette bookkeeping: a colour token whose value is exactly what the selected
+ * 配色方案 already supplies is *not* persisted. Otherwise the first palette
+ * pick would bake its values into `themes.config` as if the user had hand-
+ * tuned them, and every later palette switch would be silently pinned.
  */
 export async function updateThemePanel(
   idOrSlug: string | number,
@@ -374,12 +380,27 @@ export async function updateThemePanel(
 ): Promise<Theme> {
   const theme = await resolveTheme(idOrSlug);
   const configKeys = new Set(THEME_CONFIG_KEYS);
+  const settingsSchema = getThemeSettingsSchema(theme.slug);
+
+  // Which palettes the values might have come from: the one stored before this
+  // save, plus the one being submitted (fall back to the stored one when the
+  // payload omits `palette` entirely).
+  const previousRaw = resolveSettings(settingsSchema, theme.settings).palette;
+  const previousPalette =
+    typeof previousRaw === "string" && previousRaw ? previousRaw : null;
+  const nextRaw = payload.palette;
+  const nextPalette =
+    typeof nextRaw === "string" && nextRaw ? nextRaw : previousPalette;
+  const palettes: (string | null)[] = [previousPalette, nextPalette];
 
   const configPatch: Record<string, string> = {};
   const rest: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(payload)) {
     if (configKeys.has(k)) {
-      configPatch[k] = v == null ? "" : String(v);
+      const s = v == null ? "" : String(v);
+      // Never store "the palette said so" values as user overrides.
+      if (isPaletteSupplied(k, s, palettes)) continue;
+      configPatch[k] = s;
     } else {
       rest[k] = v;
     }
@@ -438,4 +459,23 @@ export async function getThemeSettings(slug: string): Promise<Record<string, unk
   const theme = await getThemeBySlug(slug);
   if (!theme) return {};
   return resolveSettings(getThemeSettingsSchema(theme.slug), theme.settings);
+}
+
+/**
+ * 当前主题的 config 叠加用户选中的「配色方案」后的最终令牌表。
+ *
+ * 这是渲染 CSS 变量时应使用的入口：主题设置里的 `palette` 只是配色方案
+ * 的 key，真正的颜色以预设覆盖 `themes.config` 得到。未选配色（或选了
+ * 已下线的 key）时原样返回 config，保证升级后老站点零视觉变化。
+ */
+export function getActiveThemeRenderConfig(): Promise<ThemeConfig> {
+  return publicCached(cacheKey("theme", "render-config"), getActiveThemeRenderConfigUncached);
+}
+
+async function getActiveThemeRenderConfigUncached(): Promise<ThemeConfig> {
+  const [theme, settings] = await Promise.all([
+    getActiveTheme(),
+    getActiveThemeSettings(),
+  ]);
+  return applyPalette(theme.config, settings.palette as string | undefined);
 }

@@ -56,6 +56,9 @@ export const DEFAULT_THEME_CONFIG: Required<ThemeConfig> = {
   noise: "off",
   gradient: "linear-gradient(135deg,#818cf8,#c084fc)",
 
+  // Native UI scheme (scrollbars / form controls)
+  colorScheme: "dark",
+
   // Escape hatch
   customCss: "",
 };
@@ -83,6 +86,10 @@ function merged(config: ThemeConfig | null | undefined): Required<ThemeConfig> {
  * Serialize a theme config into CSS custom properties for injection on :root.
  * Legacy aliases (`--bg`, `--accent-text`) are kept so existing themes and
  * globals.css keep working after the token set grew.
+ *
+ * `colorScheme` is emitted as the real `color-scheme` property value holder
+ * (`--color-scheme`) — themes set it from their 配色方案 so light palettes get
+ * light scrollbars and native form controls.
  */
 export function themeToCss(config: ThemeConfig | null | undefined): string {
   const c = merged(config);
@@ -93,6 +100,9 @@ export function themeToCss(config: ThemeConfig | null | undefined): string {
   }
   // Legacy alias used throughout globals.css and the shipped themes.
   decls.push(`--bg:${c.background}`);
+  // `color-scheme` itself is not a custom property — declare it directly so
+  // the browser switches native UI (scrollbars, form controls) with the palette.
+  decls.push(`color-scheme:${c.colorScheme || "dark"}`);
   return decls.join(";");
 }
 

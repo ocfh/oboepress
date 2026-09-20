@@ -1,18 +1,21 @@
 import type { MetadataRoute } from "next";
 import { getSettings } from "@/lib/services/settings";
-import { getActiveTheme } from "@/lib/services/themes";
+import { getActiveThemeRenderConfig } from "@/lib/services/themes";
 import { resolveThemeConfig } from "@/lib/theme";
 
 export const dynamic = "force-dynamic";
 
 /**
- * PWA 清单（零依赖）。名称 / 描述取站点设置，主题色取当前主题的 accent，
- * 图标取 Favicon / Logo 原图（sizes 声明 any，浏览器自行缩放）。
+ * PWA 清单（零依赖）。名称 / 描述取站点设置，主题色取当前主题叠加配色方案
+ * 后的 accent，图标取 Favicon / Logo 原图（sizes 声明 any，浏览器自行缩放）。
  * Next 识别到本文件后会自动向所有页面注入 <link rel="manifest">。
  */
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-  const [settings, theme] = await Promise.all([getSettings(), getActiveTheme()]);
-  const accent = resolveThemeConfig(theme.config).accent;
+  const [settings, renderConfig] = await Promise.all([
+    getSettings(),
+    getActiveThemeRenderConfig(),
+  ]);
+  const accent = resolveThemeConfig(renderConfig).accent;
 
   const icons: MetadataRoute.Manifest["icons"] = [];
   for (const src of [settings.faviconUrl, settings.logoUrl]) {

@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Search, ArrowLeft } from "lucide-react";
 import { listPosts } from "@/lib/services/posts";
 import { getActiveTheme } from "@/lib/services/themes";
@@ -13,10 +14,12 @@ export const dynamic = "force-dynamic";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string; page?: string };
+  searchParams: { q?: string; page?: string; all?: string };
 }) {
   const q = (searchParams.q ?? "").trim();
   const page = Math.max(1, Number(searchParams.page) || 1);
+  // ?all=1 = 用户点了「查看全部结果」，强制展示列表（跳过「唯一命中跳文章」）。
+  const showAll = searchParams.all === "1";
 
   // 维护模式优先于主题搜索页委托，维护期间统一展示维护屏。
   const maintenance = await maintenanceGate();
@@ -25,12 +28,19 @@ export default async function SearchPage({
   const theme = await getActiveTheme();
   const themeModule = await loadThemeModule(theme.slug);
   if (themeModule?.SearchPage) {
-    return <themeModule.SearchPage q={q} page={page} />;
+    return <themeModule.SearchPage q={q} page={page} all={showAll} />;
   }
 
-  const { items } = q
+  const { items, total } = q
     ? await listPosts({ status: "published", search: q, limit: 20 })
-    : { items: [] };
+    : { items: [], total: 0 };
+
+  // 唯一命中 → 直接进文章，不展示搜索列表页（与 bluemix 主题 SearchPage 行为一致）。
+  // 命中为空、多条，或用户主动「查看全部」时照常渲染列表。
+  // 用 total（整站命中数）而非 items.length，避免分页页误判。
+  if (q && !showAll && total === 1 && page === 1 && items[0]?.url) {
+    redirect(items[0].url);
+  }
 
   return (
     <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">

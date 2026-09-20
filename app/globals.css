@@ -5,9 +5,12 @@
 /* ===========================================================================
    DEFAULT THEME (OboePress — dark blog)
    These :root variables are the factory defaults. The active theme overrides
-   them at runtime via <style id="oboe-theme"> injected by the layout.
+   them at runtime via <style id="oboe-theme"> injected by the layout, and the
+   theme's own "配色方案" setting picks which token set is injected.
    =========================================================================== */
 :root {
+  /* Fallback only — the layout injects `--color-scheme` from the active
+     配色方案 so light palettes get light form controls & scrollbars too. */
   color-scheme: dark;
 
   --bg: #09090b;
@@ -26,6 +29,20 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
+}
+
+/* 背景光晕层：主题「配色方案 → 背景光晕」开启时由 Layout 渲染。
+   使用强调色做极低透明度的径向辉光，因而自动跟随任意配色方案。 */
+.theme-glow {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 420px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(60% 100% at 50% 0%, var(--accent-soft, rgba(129, 140, 248, 0.16)), transparent 70%),
+    radial-gradient(40% 80% at 15% 0%, var(--accent-soft, rgba(129, 140, 248, 0.12)), transparent 70%),
+    radial-gradient(40% 80% at 85% 0%, var(--accent-soft, rgba(129, 140, 248, 0.1)), transparent 70%);
 }
 
 /* ===========================================================================
