@@ -265,7 +265,6 @@ export default function NotifyAdmin() {
         </div>
       )}
 
-      {/* SMTP 服务器 */}
       <Card title="SMTP 发信服务器" desc="内置零依赖 SMTP 客户端，支持 465（TLS）、587（STARTTLS）与 25（明文）。密码保存后留空表示不修改。">
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-2">
@@ -317,7 +316,6 @@ export default function NotifyAdmin() {
         </div>
       </Card>
 
-      {/* 邮件通道 */}
       <Card
         title="邮件验证码通道"
         desc="开启后注册可强制邮箱验证。可走内置 SMTP，或对接任意第三方邮件 HTTP 接口。"
@@ -353,7 +351,6 @@ export default function NotifyAdmin() {
         )}
       </Card>
 
-      {/* 短信通道 */}
       <Card
         title="短信验证码通道"
         desc="内置阿里云、腾讯云短信签名调用（零依赖），也可通过任意自定义 HTTP 网关对接。密钥保存后留空表示不修改。"
@@ -504,7 +501,6 @@ export default function NotifyAdmin() {
         )}
       </Card>
 
-      {/* 注册校验开关 */}
       <Card title="注册验证码策略" desc="开启后，前台注册对应字段必须通过验证码校验；通道未开启时该开关不生效。开关也可在会员注册页管理。">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
           <div className="flex items-center gap-2 text-xs text-zinc-300">
@@ -531,7 +527,6 @@ export default function NotifyAdmin() {
         </p>
       </Card>
 
-      {/* 登录验证码开关 */}
       <Card title="登录验证码策略" desc="开启后，登录页允许使用邮箱/手机验证码免密登录；通道未开启时对应方式不显示。">
         <div className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/40 px-3 py-2">
           <div className="flex items-center gap-2 text-xs text-zinc-300">
@@ -553,7 +548,6 @@ export default function NotifyAdmin() {
         </div>
       </Card>
 
-      {/* 通道测试 */}
       <Card title="通道测试" desc="保存当前配置后，立即发送一封测试邮件或一条测试短信验证可用性。">
         <div className="flex flex-wrap items-center gap-2">
           <input

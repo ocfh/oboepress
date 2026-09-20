@@ -22,7 +22,7 @@ export const blockSchema = z.union([
     type: z.literal("quote"),
     text: z.string(),
     cite: z.string().optional(),
-    // 可选提示标题：填写后前端渲染为 nv-tip 风格的灯泡提示块
+    // 可选提示标题：填写后前端渲染为带灯泡图标的提示块
     title: z.string().optional(),
   }),
   z.object({
@@ -301,7 +301,7 @@ export const siteSettingsSchema = z.object({
   commentModerationWords: z.string().max(2000).optional(),
   commentDefaultContent: z.string().max(2000).optional(),
 
-  // Comment provider (builtin / artalk / giscus / waline / twikoo / disqus / utterances / none)
+  // Comment provider: built-in form or a third-party widget
   commentProvider: z
     .enum(["builtin", "artalk", "giscus", "waline", "twikoo", "disqus", "utterances", "none"])
     .optional(),

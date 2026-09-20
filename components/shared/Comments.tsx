@@ -12,8 +12,8 @@ const ThirdPartyComments = dynamic(
   () => import("@/components/shared/comments/CommentProviders"),
   { ssr: false },
 );
-const EmojiPanel = dynamic(
-  () => import("@/components/shared/comments/EmojiPanel"),
+const EmojiPanelWrap = dynamic(
+  () => import("@/components/shared/comments/EmojiPanelWrap"),
   { ssr: false },
 );
 
@@ -347,7 +347,7 @@ function BuiltinComments({
           >
             <Smile size={18} />
           </button>
-          {showEmoji && <EmojiPanel onSelect={insertEmoji} />}
+          <EmojiPanelWrap show={showEmoji} onSelect={insertEmoji} />
         </div>
         {!me && (
         <div className="guest-info fields flex gx-3 mx-5">

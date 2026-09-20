@@ -13,7 +13,7 @@ import {
 import type { Block } from "@/lib/blocks";
 
 /**
- * Roles follow the classic CMS role model (WordPress / Strapi style):
+ * Roles follow the classic CMS role model:
  *  - admin:   full control over everything
  *  - editor:  manage all content + media, but not users/settings
  *  - author:  manage own content only
@@ -30,8 +30,8 @@ export const commentStatusEnum = pgEnum("comment_status", ["open", "closed"]);
 export const commentStateEnum = pgEnum("comment_state", ["published", "pending", "spam"]);
 
 /**
- * Post formats (WordPress "post formats" / Tumblr-style). The theme decides how
- * each format is presented; `standard` is the normal article layout.
+ * Post formats. The theme decides how each format is presented; `standard`
+ * is the normal article layout.
  */
 export const postFormatEnum = pgEnum("post_format", [
   "standard",
@@ -162,7 +162,7 @@ const contentColumns = {
   title: text("title").notNull(),
   slug: text("slug").notNull(),
   excerpt: text("excerpt"),
-  // Block-based visual content (Gutenberg/Sanity-like).
+  // Block-based visual content.
   content: jsonb("content").$type<Block[]>().notNull().default([]),
   status: statusEnum("status").notNull().default("draft"),
   featuredImage: text("featured_image"),
@@ -188,7 +188,7 @@ export const posts = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
-    // --- Presentation & organisation (WordPress/Typecho parity) ---
+    // --- Presentation & organisation ---
     /** Post format hint for the theme (standard / quote / video / …). */
     format: postFormatEnum("format").notNull().default("standard"),
     /** Sticky: pinned to the top of listings. */
@@ -395,7 +395,7 @@ export const menuItems = pgTable(
   (t) => ({ menuIdx: index("menu_items_menu_idx").on(t.menuId) }),
 );
 
-/** Free-form custom fields attached to a post or page (wp_postmeta style). */
+/** Free-form custom fields attached to a post or page. */
 export const postMetas = pgTable(
   "post_metas",
   {
@@ -461,7 +461,7 @@ export const siteSettings = pgTable("site_settings", {
   /** Prefilled text in the built-in comment box (visitor can edit freely). */
   commentDefaultContent: text("comment_default_content").notNull().default(""),
 
-  // --- Comment provider: builtin | artalk | giscus | waline | twikoo | disqus | utterances | none ---
+  // --- Comment provider: built-in form or a third-party comment widget ---
   commentProvider: text("comment_provider").notNull().default("builtin"),
   artalkServer: text("artalk_server").notNull().default(""),
   artalkSite: text("artalk_site").notNull().default(""),
@@ -484,7 +484,7 @@ export const siteSettings = pgTable("site_settings", {
   avatarDefault: text("avatar_default").notNull().default("identicon"),
   avatarRating: text("avatar_rating").notNull().default("g"),
 
-  // --- Reading settings (WordPress「阅读设置」/ Hexo per_page) ---
+  // --- Reading settings ---
   /** "latest" = newest posts on the home page, "page" = a static front page. */
   homeDisplay: text("home_display").notNull().default("latest"),
   /** Page id used as the front page when homeDisplay = "page". */

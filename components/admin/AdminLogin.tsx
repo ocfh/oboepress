@@ -182,7 +182,6 @@ export default function AdminLogin() {
           setError(data.error || "重置失败");
           return;
         }
-        // 重置成功：回登录态并提示用新密码登录。
         setMode("login");
         setResetSent(false);
         setResetCode("");

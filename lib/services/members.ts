@@ -15,7 +15,7 @@ import { verifyCode } from "./verify-codes";
 import { ValidationError } from "./errors";
 
 /**
- * 前台会员注册（对标参考站的公开注册能力）。
+ * 前台会员公开注册。
  *
  * - 配置走 options KV（key=memberSettings），免表迁移；与「后台安全」一致，
  *   所有门控都在 node 侧完成（middleware 在 edge，读不到 PGlite）。
@@ -267,7 +267,7 @@ export function normalizeContactTarget(
 
 /**
  * 公开自助注册。仅在总开关开启时可调用；成功后返回 SessionUser，
- * 由路由层直接写入会话 cookie（注册即登录，与参考站体验一致）。
+ * 由路由层直接写入会话 cookie（注册即登录）。
  */
 export async function registerMember(input: RegisterInput): Promise<SessionUser> {
   await ensureMigrations();

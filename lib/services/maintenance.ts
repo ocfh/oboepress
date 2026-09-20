@@ -4,7 +4,7 @@ import { getOption, setOption } from "./options";
 import { getSession } from "@/lib/auth";
 
 /**
- * 维护模式（对标 WordPress 维护页 / Typecho 维护插件）。
+ * 维护模式落地页。
  * 配置走 options KV（key=maintenanceSettings），免迁移。
  * 开启后前台所有内容路由向访客展示维护页；管理员 / 编辑等已登录后台用户
  * 照常访问，伪装入口与注册 / 找回密码页也始终放行（门控在 catch-all 中）。

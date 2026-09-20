@@ -28,7 +28,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
         label: "页脚版权文字",
         type: "textarea",
         default: "",
-        help: "支持 HTML，留空则使用默认版权行。例如：Designed &amp; Coded by PANDA Studio © 2023",
+        help: "支持 HTML，留空则使用默认版权行。例如：© 2026 站点名称",
       },
       { key: "icpNumber", label: "备案号", type: "text", default: "", half: true },
       {
@@ -54,7 +54,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
     key: "reading",
     label: "阅读",
     icon: "BookOpen",
-    description: "首页展示方式、分页数量与摘要长度 —— 对应 WordPress 的「阅读设置」。",
+    description: "首页展示方式、分页数量与摘要长度等阅读相关设置。",
     fields: [
       {
         key: "homeDisplay",
@@ -220,7 +220,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
     label: "评论",
     icon: "MessageSquare",
     description:
-      "评论系统可在「系统自带」与第三方（Artalk / Giscus / Waline / Twikoo / Disqus / Utterances）之间切换；头像源决定内置评论里头像的解析方式（含 QQ 邮箱直出 QQ 头像）。",
+      "评论系统可在「系统自带」与多种第三方评论服务之间切换；头像源决定内置评论里头像的解析方式（含 QQ 邮箱直出 QQ 头像）。",
     fields: [
       { key: "commentsEnabled", label: "开启评论", type: "switch", default: true, half: true },
       {
@@ -264,7 +264,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
           { value: "artalk", label: "Artalk（自建）" },
           { value: "giscus", label: "Giscus（GitHub 讨论）" },
           { value: "waline", label: "Waline（valine 继任）" },
-          { value: "twikoo", label: "Twikoo（腾讯云/私有）" },
+          { value: "twikoo", label: "腾讯云开发评论（私有部署）" },
           { value: "disqus", label: "Disqus" },
           { value: "utterances", label: "Utterances（GitHub Issues）" },
           { value: "none", label: "不显示评论" },
@@ -365,7 +365,7 @@ export const SITE_SETTINGS_SCHEMA: SettingsSchema = [
       },
       {
         key: "twikooEnvId",
-        label: "Twikoo 环境 ID",
+        label: "评论环境 ID",
         type: "text",
         default: "",
         placeholder: "your-env-id",

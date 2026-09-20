@@ -107,7 +107,7 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** 统一截成 W3C 日期（参考站 sitemap 即为 YYYY-MM-DD）。 */
+/** W3C 日期统一截成 YYYY-MM-DD。 */
 function day(value?: Date | string | null): string | undefined {
   if (!value) return undefined;
   const d = value instanceof Date ? value : new Date(value);

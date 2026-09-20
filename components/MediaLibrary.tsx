@@ -287,7 +287,6 @@ export default function MediaLibrary() {
                   isSel ? "border-indigo-500 ring-1 ring-indigo-500" : "border-zinc-800"
                 }`}
               >
-                {/* select checkbox */}
                 <label
                   className="absolute left-2 top-2 z-10 cursor-pointer rounded bg-black/50 p-1"
                   onClick={(e) => e.stopPropagation()}
@@ -368,7 +367,6 @@ export default function MediaLibrary() {
         </div>
       )}
 
-      {/* Edit modal */}
       {editingId !== null && (
         <EditModal
           item={items.find((m) => m.id === editingId) ?? null}
@@ -382,7 +380,6 @@ export default function MediaLibrary() {
         />
       )}
 
-      {/* Preview modal */}
       {preview && (
         <PreviewModal item={preview} onClose={() => setPreview(null)} />
       )}

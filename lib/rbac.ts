@@ -1,7 +1,7 @@
 import type { Role } from "@/db/schema";
 
 /**
- * Capability-based permission matrix (WordPress / Strapi style).
+ * Capability-based permission matrix.
  * Each role is a set of capabilities. Services check `can(role, cap)`.
  */
 export type Capability =

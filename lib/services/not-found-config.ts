@@ -3,7 +3,7 @@ import { cache } from "react";
 import { getOption, setOption } from "./options";
 
 /**
- * 自定义 404 页（对标 WordPress 404page 类插件）。
+ * 自定义 404 页配置。
  * 配置存 options KV（key=notFoundSettings），免迁移；前台 app/not-found.tsx
  * 与后台设置页共用此服务。
  */

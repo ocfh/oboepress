@@ -250,7 +250,6 @@ export default function ContentEditor({
 
   function exportMarkdown() {
     const md = blocksToMarkdown(blocks);
-    // Download as .md file
     const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

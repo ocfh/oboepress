@@ -2,8 +2,7 @@
  * Resolve the comment *provider* configuration from the site settings row into
  * a single, client-safe object. The `Comments` component fetches this from
  * `/api/comments/config` and uses it to decide whether to render the built-in
- * form or inject a third-party widget (Artalk / Giscus / Waline / Twikoo /
- * Disqus / Utterances).
+ * form or inject a configured third-party comment widget.
  */
 import type { SiteSettings } from "@/db/schema";
 import type { AvatarSource } from "./avatar";

@@ -6,8 +6,7 @@ import { getAdminSecurity } from "./security";
 import { ValidationError } from "./errors";
 
 /**
- * 安全事件流水 + 登录失败限流（对标 WordPress Wordfence / Limit Login
- * Attempts 的基础能力）。
+ * 安全事件流水 + 登录失败限流。
  *
  * 限流模型：滑动窗口内「同一账号 或 同一 IP」的 login.fail 事件数达到阈值即
  * 暂时拒绝登录；窗口自然滑过后自动解锁，无需定时任务。统计与锁定共用

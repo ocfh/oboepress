@@ -76,7 +76,7 @@ async function runBootstrap(): Promise<void> {
     {
       location: "header",
       name: "顶部导航",
-      // every reference-site top-nav item ships a glyph with margin-right:6px.
+      // 顶部导航条目都配图标（图标带 6px 右间距）。
       // "house" (not "home"): lucide renamed Home → House, and CatIcon silently
       // renders null for names outside the icon-names whitelist.
       items: [{ label: "首页", url: "/", order: 1, icon: "house" }],

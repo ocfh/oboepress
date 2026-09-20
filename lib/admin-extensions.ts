@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Circle,
+  LayoutDashboard,
   Plug,
   Rocket,
   Wand2,
@@ -68,6 +69,7 @@ export type DashboardCardItem = {
 /** lucide icon-name registry shared between core and hooked sidebar items. */
 export const ADMIN_ICONS: Record<string, LucideIcon> = {
   filetext: Circle, // CLI cannot statically resolve every export; core uses direct imports.
+  dashboard: LayoutDashboard,
   plugin: Plug,
   rocket: Rocket,
   wand: Wand2,

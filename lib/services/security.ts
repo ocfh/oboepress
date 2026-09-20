@@ -4,7 +4,7 @@ import { getPermalinkConfig } from "./links";
 import { ValidationError } from "./errors";
 
 /**
- * 后台入口伪装（对标 Typecho / WordPress 的 Hide Login 类插件）。
+ * 后台入口伪装。
  *
  * 开启后未登录访客看到的整个 /admin 树（含 /admin/login）都是 404，
  * 真正的登录页只在自定义秘密入口路径渲染。配置存 options KV，免迁移；

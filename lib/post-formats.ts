@@ -1,9 +1,8 @@
 import type { PostFormat } from "@/db/schema";
 
 /**
- * 文章形式（WordPress「文章形式」/ Tumblr post types）。形式是*展示提示*而非
- * 内容类型：数据不变，主题可按形式差异化渲染。extraFields 声明编辑器展示的
- * 输入，值存于 posts.formatMeta，无需改表即可新增形式。
+ * 文章形式。形式是*展示提示*而非内容类型：数据不变，主题可按形式差异化渲染。
+ * extraFields 声明编辑器展示的输入，值存于 posts.formatMeta，无需改表即可新增形式。
  */
 
 export type PostFormatDef = {
@@ -96,7 +95,7 @@ export const POST_FORMATS: PostFormatDef[] = [
     value: "status",
     label: "状态",
     icon: "MessageCircle",
-    description: "一句话动态，类似微博",
+    description: "一句话即时动态",
     hideTitle: true,
   },
 ];

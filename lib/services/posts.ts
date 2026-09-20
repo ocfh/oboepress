@@ -48,7 +48,7 @@ export type PostQuery = {
   /** Archive filters — 4-digit year and optional 1-12 month. */
   year?: number;
   month?: number;
-  /** Sticky posts float to the top of the first page (WordPress behaviour). */
+  /** Sticky posts float to the top of the first page. */
   pinnedFirst?: boolean;
   /**
    * Set false to opt out of plugin-contributed floating posts (feeds,

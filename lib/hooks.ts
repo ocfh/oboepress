@@ -238,4 +238,17 @@ export const HOOKS = {
    * Payload/route shape: see lib/services/virtual-routes.ts.
    */
   siteRoutes: "site.routes",
+  /**
+   * async filter — ({ items }) add entries to the front-end user center (/me).
+   * Item shape: { href, label, icon? }. Registered pages are usually the same
+   * plugin's site.routes virtual pages; any logged-in member sees them.
+   */
+  userCenterMenu: "usercenter.menu",
+  /**
+   * async filter — ({ slug, path, method, request, response }) plugin HTTP
+   * gateway. Core route /api/plugin/<slug>/<...path> runs enabled plugins in
+   * slug order; the owning plugin sets `response` ({ status, body, headers }),
+   * others pass through. Unclaimed requests 404.
+   */
+  apiRequest: "api.request",
 } as const;

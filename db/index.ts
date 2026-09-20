@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { sql, type SQL } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
@@ -270,25 +271,31 @@ export const db = new Proxy({} as Database, {
 }) as Database;
 
 /**
- * 驱动无关的原始 SQL 入口：两种驱动的原生返回形状不同（postgres-js 直接
- * 返回行数组，PGlite 返回 { rows }），备份等需要按 information_schema 动态
- * 拼装 SQL 的场景统一在这里归一化为行数组。参数一律用 $1/$2 占位。
+ * 驱动无关的原始 SQL 入口：经 drizzle 句柄执行（两种驱动都支持 execute），
+ * 返回形状统一归一化为行数组。参数一律用 $1/$2 占位，由 drizzle 绑定，
+ * 不做字符串拼接。走句柄也避免了 dev 下模块被重复实例化时进程级客户端
+ * 变量与 drizzle 代理脱节的问题。
  */
 export async function rawQuery<T = Record<string, unknown>>(
   query: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  getDb();
-  if (driver === "postgres" && postgresClient) {
-    // postgres.js 对绑定参数有自己的联合类型；这里是透传原始 SQL 的边界，
-    // 调用方（备份服务）保证只传 JSON 可序列化标量。
-    return (await postgresClient.unsafe(query, params as never[])) as T[];
+  const client = getDb();
+  let built: SQL = sql``;
+  const re = /\$(\d+)/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(query))) {
+    built.append(sql.raw(query.slice(last, m.index)));
+    // 模板插值让 drizzle 自动生成绑定参数（值不进入 SQL 文本）。
+    const value = params[Number(m[1]) - 1];
+    built.append(sql`${value}`);
+    last = m.index + m[0].length;
   }
-  if (pgliteClient) {
-    const res = await pgliteClient.query<T>(query, params);
-    return res.rows;
-  }
-  throw new Error("数据库尚未初始化");
+  built.append(sql.raw(query.slice(last)));
+  const res: unknown = await client.execute(built);
+  if (Array.isArray(res)) return res as T[];
+  return ((res as { rows?: T[] }).rows ?? []) as T[];
 }
 
 export { schema };

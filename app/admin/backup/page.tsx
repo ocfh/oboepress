@@ -93,7 +93,6 @@ export default function BackupPage() {
         可在不同服务器与数据库驱动间迁移。备份不包含 <code>uploads</code> 媒体文件，需另行备份。
       </p>
 
-      {/* 下载备份 */}
       <section className={`mt-6 space-y-4 ${cardCls}`}>
         <h2 className="text-sm font-semibold text-zinc-200">下载整库备份</h2>
         <p className="text-xs text-zinc-500">
@@ -108,7 +107,6 @@ export default function BackupPage() {
         </a>
       </section>
 
-      {/* 恢复 */}
       <section className={`mt-6 space-y-4 ${cardCls}`}>
         <h2 className="flex items-center gap-2 text-sm font-semibold text-zinc-200">
           <TriangleAlert size={15} className="text-red-400" />

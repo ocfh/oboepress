@@ -194,7 +194,6 @@ select option {
   margin: 1.5rem 0;
 }
 
-/* Buttons / inputs respect the theme too */
 .btn-accent {
   background: var(--accent);
   color: var(--accent-text);
@@ -222,9 +221,9 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
    Built-in comment form — shared structural baseline
    Markup: components/shared/Comments.tsx (.comment-form). Selectors stay
    low-specificity on purpose: bluemix / codeman / pseudolinear ship their own
-   higher-specificity overrides; this block only guarantees a usable,
-   reference-style (bordered .input box, icon guest row, right-aligned submit)
-   form in themes without form CSS — default / skyscraper —
+   higher-specificity overrides; this block only guarantees a usable form
+   (bordered .input box, icon guest row, right-aligned submit) in themes
+   without form CSS — default / skyscraper —
    using the generic theme tokens (--surface, --border, --accent, …).
    =========================================================================== */
 .comment-form{ display:block; margin:20px 0; }
@@ -255,7 +254,7 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
   background:transparent; color:var(--muted); transition:color .15s ease;
 }
 .comment-form .funcs>button:hover{ color:var(--accent); }
-/* 游客三输入框对齐参考站 Twikoo：13px/34px 高，左侧图标前缀与输入框连体
+/* 游客三输入框设计规格：13px/34px 高，左侧图标前缀与输入框连体
    （前缀左圆角、输入框右圆角），聚焦时主色描边 + 柔光 */
 .comment-form .guest-info{ display:flex; gap:8px; }
 .comment-form .guest-info .item{ position:relative; flex:1 1 0; min-width:0; }
@@ -294,7 +293,9 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
   display:inline-flex; align-items:center; gap:4px;
   padding:8px 10px; border:0; background:transparent; cursor:pointer;
   font-size:14px; font-family:inherit; color:var(--muted);
+  animation:sf-cancel-in .2s cubic-bezier(.34,1.4,.64,1);
 }
+@keyframes sf-cancel-in{ from{ opacity:0; transform:translateX(8px);} to{ opacity:1; transform:none; } }
 .comment-form .cancel:hover{ color:var(--text); }
 .comment-form .btn-submit{
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
@@ -372,4 +373,16 @@ html:not(.is-mac) *::-webkit-scrollbar-thumb{ background-color:#828c9666; }
 }
 @media (max-width:650.5px){
   .emoji-panel .panel{ width:min(290px, calc(100vw - 78px)); }
+}
+/* 表情面板开合动效：从触发钮位置弹性弹出，关闭反向收合 */
+.emoji-panel-wrap{ display:contents; }
+.emoji-panel-wrap .emoji-panel{
+  transform-origin:0 100%;
+  transition:opacity .18s ease, transform .22s cubic-bezier(.34,1.56,.64,1);
+  will-change:opacity, transform;
+}
+.emoji-panel-wrap:not(.is-in) .emoji-panel{
+  opacity:0;
+  transform:translateY(10px) scale(.88);
+  pointer-events:none;
 }

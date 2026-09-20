@@ -108,7 +108,7 @@ export interface ThemeModule {
    *  default OboePress markup. */
   BlogListPage?: React.ComponentType<{ page: number }>;
   CategoryPage?: React.ComponentType<{ slug: string }>;
-  SearchPage?: React.ComponentType<{ q: string }>;
+  SearchPage?: React.ComponentType<{ q: string; page?: number }>;
   /** Optional theme-branded 404 screen; falls back to the shared one. */
   NotFoundPage?: React.ComponentType<{ settings: NotFoundSettings }>;
 }
@@ -185,7 +185,7 @@ export function getThemeManifest(slug: string): ThemeManifest | null {
 /**
  * A theme's own settings schema (empty array when it declares none).
  *
- * Tolerates two manifest shapes so a ported theme never crashes the panel:
+ * Tolerates two manifest shapes so an imported theme never crashes the panel:
  *   1. a flat array of sections — the canonical `SettingsSchema` contract;
  *   2. `{ sections: [...] }` where each inner section may use `title` instead
  *      of `label` and omit `key` (a common copy-paste from other CMS themes).

@@ -177,7 +177,6 @@ export default function PermalinksAdmin() {
         </div>
       )}
 
-      {/* 实时预览 */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
         <h2 className="mb-3 text-sm font-semibold text-zinc-100">链接预览</h2>
         <ul className="space-y-2 font-mono text-xs text-zinc-300">
@@ -204,7 +203,6 @@ export default function PermalinksAdmin() {
         </ul>
       </div>
 
-      {/* 文章链接形式 */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
         <h2 className="mb-1 text-sm font-semibold text-zinc-100">文章链接形式</h2>
         <p className="mb-4 text-xs text-zinc-500">
@@ -247,7 +245,6 @@ export default function PermalinksAdmin() {
         )}
       </div>
 
-      {/* 路径前缀 */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
         <h2 className="mb-1 text-sm font-semibold text-zinc-100">路径前缀</h2>
         <p className="mb-4 text-xs text-zinc-500">

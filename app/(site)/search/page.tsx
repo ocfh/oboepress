@@ -13,9 +13,10 @@ export const dynamic = "force-dynamic";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: { q?: string };
+  searchParams: { q?: string; page?: string };
 }) {
   const q = (searchParams.q ?? "").trim();
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   // 维护模式优先于主题搜索页委托，维护期间统一展示维护屏。
   const maintenance = await maintenanceGate();
@@ -24,7 +25,7 @@ export default async function SearchPage({
   const theme = await getActiveTheme();
   const themeModule = await loadThemeModule(theme.slug);
   if (themeModule?.SearchPage) {
-    return <themeModule.SearchPage q={q} />;
+    return <themeModule.SearchPage q={q} page={page} />;
   }
 
   const { items } = q

@@ -398,7 +398,7 @@ function LinksField({
 }
 
 /**
- * Repeatable footer-link editor mirroring the reference site's footer_links:
+ * Repeatable editor for the footer_links field:
  * each row is link text (HTML allowed), URL, and an optional 16px icon URL.
  */
 function FooterLinksField({

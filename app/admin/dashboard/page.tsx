@@ -4,9 +4,9 @@ import { ADMIN_HOME_DEFAULT, getAdminMenuPrefs } from "@/lib/admin-menu";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminHome() {
+export default async function DashboardPage() {
   const { homePath } = await getAdminMenuPrefs();
-  // 设了其他首页时 /admin 直达该页；仪表盘本身移到 /admin/dashboard。
-  if (homePath !== ADMIN_HOME_DEFAULT) redirect(homePath);
+  // 默认首页就是仪表盘时，规范回 /admin。
+  if (homePath === ADMIN_HOME_DEFAULT) redirect(ADMIN_HOME_DEFAULT);
   return <Dashboard />;
 }

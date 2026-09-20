@@ -1,7 +1,7 @@
 import { applyFilters, HOOKS } from "@/lib/hooks";
 
 /**
- * WordPress 风格 `[tag]` 宏，输出时展开为标记。插件/主题经
+ * `[tag]` 风格宏，输出时展开为标记。插件/主题经
  * `shortcode.register` 过滤器注册自定义标签；`[[tag]]` 双重括号转义为字面量。
  */
 

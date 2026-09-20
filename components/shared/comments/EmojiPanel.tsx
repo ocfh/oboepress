@@ -1,8 +1,8 @@
 "use client";
 
-// Reference (blog.panda-studio.cn/samsara) emoji picker, faithfully ported:
-// one scrollable body with sticky group titles; clicking a tab scrolls to the
-// group; scrolling highlights the tab of the group in view (-30px threshold).
+// Emoji picker: one scrollable body with sticky group titles; clicking a tab
+// scrolls to the group; scrolling highlights the tab of the group in view
+// (-30px threshold).
 import { useRef, useState } from "react";
 import DATA from "./emoji-data.json";
 
