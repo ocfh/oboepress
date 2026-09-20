@@ -15,3 +15,5 @@ content/backups/*
 !content/backups/.gitkeep
 public/
 db/seed-demo.ts
+.data/**/postmaster.pid
+.data/**/.s.PGSQL.*
