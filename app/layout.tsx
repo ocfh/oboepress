@@ -110,7 +110,7 @@ export default async function RootLayout({
   const PublicLayout = themeModule.PublicLayout;
   return (
     <html lang="zh-CN">
-      <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+      <body className="min-h-screen bg-[var(--bg)] text-[var(--text)] antialiased">
         <style id="oboe-theme" dangerouslySetInnerHTML={{ __html: `:root{${css}}` }} />
         {settings.customCss ? (
           <style id="oboe-custom-css" dangerouslySetInnerHTML={{ __html: settings.customCss }} />

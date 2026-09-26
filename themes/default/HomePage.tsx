@@ -22,17 +22,17 @@ export default async function OboePressHomePage() {
     <div className="space-y-10">
       <section className="relative overflow-hidden rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] to-[var(--bg)] px-8 py-12 text-center">
         <Sparkles size={28} className="mx-auto mb-4 text-[var(--accent)]" />
-        <h1 className="text-4xl font-bold tracking-tight text-zinc-100">{settings.siteTitle}</h1>
-        {settings.tagline && <p className="mt-3 text-base text-zinc-400">{settings.tagline}</p>}
+        <h1 className="text-4xl font-bold tracking-tight text-[var(--text)]">{settings.siteTitle}</h1>
+        {settings.tagline && <p className="mt-3 text-base text-[var(--muted)]">{settings.tagline}</p>}
         {settings.siteDescription && (
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-zinc-500">{settings.siteDescription}</p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-[var(--muted)]">{settings.siteDescription}</p>
         )}
       </section>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">
         <div>
           {items.length === 0 ? (
-            <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-zinc-400">
+            <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-[var(--muted)]">
               还没有已发布的文章。
             </p>
           ) : (
@@ -61,7 +61,7 @@ export default async function OboePressHomePage() {
                         </Link>
                       ))}
                     </div>
-                    <h2 className="text-2xl font-bold leading-snug text-zinc-100">
+                    <h2 className="text-2xl font-bold leading-snug text-[var(--text)]">
                       <Link href={`/blog/${featured.slug}`} className="transition group-hover:text-[var(--accent)]">
                         {featured.title}
                       </Link>
@@ -71,7 +71,7 @@ export default async function OboePressHomePage() {
                       推荐阅读
                     </span>
                     {featured.excerpt && (
-                      <p className="mt-3 line-clamp-3 text-sm text-zinc-400">{featured.excerpt}</p>
+                      <p className="mt-3 line-clamp-3 text-sm text-[var(--muted)]">{featured.excerpt}</p>
                     )}
                   </div>
                 </article>

@@ -63,7 +63,7 @@ export default async function OboePressPostPage({ params }: { params: { slug: st
           <header className="mb-6">
             <Link
               href="/"
-              className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-[var(--accent)]"
+              className="mb-4 inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--accent)]"
             >
               <ArrowLeft size={14} />
               返回首页
@@ -90,8 +90,8 @@ export default async function OboePressPostPage({ params }: { params: { slug: st
                 </Link>
               ))}
             </div>
-            <h1 className="text-3xl font-bold leading-tight text-zinc-100">{post.title}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-zinc-500">
+            <h1 className="text-3xl font-bold leading-tight text-[var(--text)]">{post.title}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-[var(--muted)]">
               <span className="inline-flex items-center gap-1">
                 <User size={14} />
                 {post.author?.name ?? "未知作者"}
@@ -112,7 +112,7 @@ export default async function OboePressPostPage({ params }: { params: { slug: st
               )}
             </div>
             {meta.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-zinc-500">
+              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-[var(--muted)]">
                 {meta.map((m) => (
                   <span key={m.label}>{m.label}：{m.value}</span>
                 ))}
@@ -136,7 +136,7 @@ export default async function OboePressPostPage({ params }: { params: { slug: st
                 <Link
                   key={t.id}
                   href={`/blog/tag/${t.slug}`}
-                  className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-zinc-300 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
                 >
                   #{t.name}
                 </Link>

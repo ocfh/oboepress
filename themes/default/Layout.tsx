@@ -47,7 +47,7 @@ export default async function OboePressLayout({
   const faintTextClass = dark ? "text-zinc-500" : "text-[var(--muted)]";
   const headerClass = glass
     ? "sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--header-bg)] backdrop-blur"
-    : "sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]/85";
+    : "sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]";
 
   return (
     <div className="theme-root relative flex min-h-screen flex-col">

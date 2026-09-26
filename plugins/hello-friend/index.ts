@@ -1,4 +1,5 @@
 import { definePlugin } from "@/lib/plugins/api";
+import { APP_BRAND } from "@/lib/version";
 import { BRAND_ART } from "./brand-art";
 
 /**
@@ -14,6 +15,7 @@ import { BRAND_ART } from "./brand-art";
  *   - enabled=false       → 不输出任何东西；
  *   - content 非空         → 输出自定义内容（管理员可在面板里改）；
  *   - content 为空（默认） → 输出品牌字符画（见 brand-art.ts）；
+ *   - showVersion=true     → 追加程序版本「OboePress vX.Y.Z」（默认开）；
  *   - showTime=true        → 追加「页面加载时间 YYYY-M-D H:M:S」；
  *   - showUrl=true         → 追加「当前 URL <location.href>」。
  */
@@ -23,6 +25,7 @@ type Settings = {
   content: string;
   showTime: boolean;
   showUrl: boolean;
+  showVersion: boolean;
 };
 
 export default definePlugin<Settings>({
@@ -36,6 +39,9 @@ export default definePlugin<Settings>({
         content: settings.content || "",
         showTime: !!settings.showTime,
         showUrl: !!settings.showUrl,
+        showVersion: settings.showVersion !== false,
+        // 版本号在服务端渲染时固化进脚本，浏览器端不依赖任何接口。
+        brand: APP_BRAND,
       });
 
       payload.html.push(`<script>(function(){
@@ -50,6 +56,7 @@ export default definePlugin<Settings>({
   var lines=[];
   var body=(C.content && C.content.trim()) ? C.content : ${JSON.stringify(BRAND_ART)};
   lines.push(body);
+  if(C.showVersion) lines.push(C.brand || '');
   if(C.showTime) lines.push('页面加载时间 '+ts());
   if(C.showUrl) lines.push('当前 URL '+location.href);
   var art=lines.join('\\n');

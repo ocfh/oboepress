@@ -22,7 +22,7 @@ export default async function Sidebar() {
         <div className="relative">
           <Search
             size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
           />
           <input
             name="q"
@@ -33,7 +33,7 @@ export default async function Sidebar() {
       </form>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
           <Folder size={15} />
           分类
         </h3>
@@ -42,7 +42,7 @@ export default async function Sidebar() {
             <li key={c.id}>
               <Link
                 href={c.url}
-                className="flex items-center gap-1.5 text-zinc-300 hover:text-[var(--accent)]"
+                className="flex items-center gap-1.5 text-[var(--text)] hover:text-[var(--accent)]"
               >
                 {showCatIcons ? (
                   <ServerIcon name={c.icon} size={14} className="text-[var(--accent)]" />
@@ -51,12 +51,12 @@ export default async function Sidebar() {
               </Link>
             </li>
           ))}
-          {cats.length === 0 && <li className="text-zinc-500">暂无分类</li>}
+          {cats.length === 0 && <li className="text-[var(--muted)]">暂无分类</li>}
         </ul>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
           <Tags size={15} />
           标签
         </h3>
@@ -65,27 +65,27 @@ export default async function Sidebar() {
             <Link
               key={t.id}
               href={t.url}
-              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-zinc-300 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
             >
               #{t.name}
             </Link>
           ))}
-          {tags.length === 0 && <span className="text-xs text-zinc-500">暂无标签</span>}
+          {tags.length === 0 && <span className="text-xs text-[var(--muted)]">暂无标签</span>}
         </div>
       </div>
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-zinc-400">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
           <Clock size={15} />
           最新文章
         </h3>
         <ul className="space-y-2 text-sm">
           {recent.items.map((p) => (
             <li key={p.id}>
-              <Link href={p.url} className="text-zinc-300 hover:text-[var(--accent)]">
+              <Link href={p.url} className="text-[var(--text)] hover:text-[var(--accent)]">
                 {p.title}
               </Link>
-              <p className="text-xs text-zinc-500">{formatDate(p.publishedAt)}</p>
+              <p className="text-xs text-[var(--muted)]">{formatDate(p.publishedAt)}</p>
             </li>
           ))}
         </ul>

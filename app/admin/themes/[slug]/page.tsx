@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ThemeSettingsForm from "@/components/ThemeSettingsForm";
 import { getThemePanel } from "@/lib/services/themes";
+import { DEFAULT_THEME_CONFIG } from "@/lib/theme";
 import { getThemeManifest, loadThemeModule } from "@/themes/registry";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export default async function ThemeSettingsPage({
         widgetAreas={panel.widgetAreas}
         initialConfig={panel.config}
         initialSettings={panel.settings}
+        baselineConfig={{ ...DEFAULT_THEME_CONFIG, ...(manifest?.config ?? {}) }}
       />
 
       {SettingsPanel ? (

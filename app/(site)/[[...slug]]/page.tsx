@@ -314,8 +314,9 @@ export default async function SiteCatchAll({ params, searchParams }: RouteProps)
 
     case "category": {
       const category = res.category;
+      const archivePage = Math.max(1, Number(searchParams?.page) || 1);
       if (themeModule.CategoryPage) {
-        content = <themeModule.CategoryPage slug={category.slug} />;
+        content = <themeModule.CategoryPage slug={category.slug} page={archivePage} />;
         break;
       }
       const [{ items }, ts] = await Promise.all([
@@ -360,6 +361,11 @@ export default async function SiteCatchAll({ params, searchParams }: RouteProps)
 
     case "tag": {
       const tag = res.tag;
+      const tagPage = Math.max(1, Number(searchParams?.page) || 1);
+      if (themeModule.TagPage) {
+        content = <themeModule.TagPage slug={tag.slug} page={tagPage} />;
+        break;
+      }
       const { items } = await listPosts({ status: "published", tagSlug: tag.slug, limit: 12 });
       content = (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">

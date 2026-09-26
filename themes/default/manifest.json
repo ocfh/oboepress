@@ -2,7 +2,7 @@
   "name": "OboePress Default",
   "slug": "default",
   "description": "Default dark blog theme with elegant typography",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "author": "OboePress",
   "isDefault": true,
   "config": {

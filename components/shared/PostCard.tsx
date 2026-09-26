@@ -28,15 +28,15 @@ export default function PostCard({ post }: { post: PostListItem }) {
             </Link>
           ))}
         </div>
-        <h2 className="text-lg font-semibold leading-snug text-zinc-100">
+        <h2 className="text-lg font-semibold leading-snug text-[var(--text)]">
           <Link href={post.url} className="transition group-hover:text-[var(--accent)]">
             {post.title}
           </Link>
         </h2>
         {post.excerpt ? (
-          <p className="mt-2 line-clamp-3 flex-1 text-sm text-zinc-400">{post.excerpt}</p>
+          <p className="mt-2 line-clamp-3 flex-1 text-sm text-[var(--muted)]">{post.excerpt}</p>
         ) : null}
-        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
           <span className="inline-flex items-center gap-1">
             <User size={13} />
             {post.author?.name ?? "未知作者"}

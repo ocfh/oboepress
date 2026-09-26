@@ -39,7 +39,9 @@ export default async function SearchPage({
   // 命中为空、多条，或用户主动「查看全部」时照常渲染列表。
   // 用 total（整站命中数）而非 items.length，避免分页页误判。
   if (q && !showAll && total === 1 && page === 1 && items[0]?.url) {
-    redirect(items[0].url);
+    // Next 的 redirect() 不接受含非 ASCII 字符的 Location（ERR_INVALID_CHAR），
+    // 中文固定链接的文章地址必须先 encodeURI 再跳。
+    redirect(encodeURI(items[0].url));
   }
 
   return (

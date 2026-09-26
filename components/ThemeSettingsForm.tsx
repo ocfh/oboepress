@@ -14,7 +14,7 @@ import {
 import { SectionFields } from "@/components/SettingsFields";
 import type { SettingsSchema } from "@/lib/settings-schema";
 import { themeToVars } from "@/lib/theme";
-import { getPalettePreset } from "@/lib/theme-palettes";
+import { getPalettePreset, paletteLayeredConfig } from "@/lib/theme-palettes";
 import type { ThemeConfig } from "@/db/schema";
 
 /**
@@ -39,6 +39,8 @@ type Props = {
   widgetAreas: { key: string; label: string; description?: string }[];
   initialConfig: Record<string, unknown>;
   initialSettings: Record<string, unknown>;
+  /** 出厂默认 + manifest 的基线值 —— 与基线同值的令牌不算用户微调。 */
+  baselineConfig: Record<string, unknown>;
 };
 
 export default function ThemeSettingsForm(props: Props) {
@@ -70,15 +72,16 @@ export default function ThemeSettingsForm(props: Props) {
         if (typeof v === "string" && v.trim()) cfg[f.key] = v;
       }
     }
-    const paletteKey = typeof draft.palette === "string" ? draft.palette : undefined;
-    const preset = getPalettePreset(paletteKey);
-    // Preset first, explicit token edits second — the user's per-token
-    // tweaks must win over the palette they started from.
-    const merged = preset
-      ? ({ ...preset.tokens, ...cfg } as ThemeConfig)
-      : (cfg as ThemeConfig);
-    return themeToVars(merged);
-  }, [draft, props.appearanceSchema]);
+    // Same layering as the public render path (baseline → 配色方案 → 微调)，
+    // otherwise every untouched token would pin the palette here too.
+    return themeToVars(
+      paletteLayeredConfig(
+        cfg as ThemeConfig,
+        props.baselineConfig as Partial<ThemeConfig>,
+        typeof draft.palette === "string" ? draft.palette : undefined,
+      ),
+    );
+  }, [draft, props.appearanceSchema, props.baselineConfig]);
 
   function set(key: string, value: unknown) {
     setDraft((d) => ({ ...d, [key]: value }));

@@ -38,6 +38,7 @@ import {
 import type { SessionUser } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
 import { ADMIN_ICONS } from "@/lib/admin-extensions";
+import { APP_VERSION } from "@/lib/version";
 import type { AdminMenuGroup, AdminMenuLeaf } from "@/lib/admin-menu";
 
 const CORE_ICONS: Record<string, LucideIcon> = {
@@ -162,7 +163,7 @@ export default function AdminShell({
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold leading-tight text-indigo-400">OboePress</p>
-            <p className="text-xs text-zinc-500">管理后台</p>
+            <p className="text-xs text-zinc-500">管理后台 · v{APP_VERSION}</p>
           </div>
           {/* 抽屉内关闭钮（lg 以上侧栏常驻，隐藏） */}
           <button
@@ -203,7 +204,7 @@ export default function AdminShell({
                   type="button"
                   onClick={() => setOpenMap((m) => ({ ...m, [group.id]: !open }))}
                   aria-expanded={open}
-                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-[11px] font-semibold uppercase tracking-wider transition hover:bg-zinc-800/60 hover:text-zinc-200 ${
+                  className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition hover:bg-zinc-800/60 hover:text-zinc-200 ${
                     groupActive ? "text-zinc-300" : "text-zinc-500"
                   }`}
                 >
@@ -233,7 +234,7 @@ export default function AdminShell({
                           )}
                         </>
                       );
-                      const cls = `flex items-center gap-2.5 rounded-md py-1.5 pl-9 pr-3 text-[13px] transition hover:bg-zinc-800/60 hover:text-white ${
+                      const cls = `flex items-center gap-2.5 rounded-md py-2 pl-9 pr-3 text-sm transition hover:bg-zinc-800/60 hover:text-white ${
                         active ? "bg-zinc-800 text-white" : "text-zinc-400"
                       }`;
                       // 外链二级项（说明文档、作者网址等）用原生 <a> 新标签打开。

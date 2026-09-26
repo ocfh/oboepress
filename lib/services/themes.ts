@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { siteSettings, themes, type Theme, type ThemeConfig } from "@/db/schema";
 import { coerceSettings, resolveSettings, type SettingsSchema } from "@/lib/settings-schema";
 import { DEFAULT_THEME_CONFIG, resolveThemeConfig } from "@/lib/theme";
-import { applyPalette, isPaletteSupplied } from "@/lib/theme-palettes";
+import { paletteLayeredConfig, getPalettePreset } from "@/lib/theme-palettes";
 import { THEME_CONFIG_KEYS, THEME_CONFIG_SCHEMA } from "@/lib/theme-schema";
 import {
   discoverThemes,
@@ -369,10 +369,11 @@ export async function getThemePanel(idOrSlug: string | number): Promise<ThemePan
  * `themes.settings`. Unknown keys are dropped, so a stale browser tab can never
  * write junk into the row.
  *
- * Palette bookkeeping: a colour token whose value is exactly what the selected
- * 配色方案 already supplies is *not* persisted. Otherwise the first palette
- * pick would bake its values into `themes.config` as if the user had hand-
- * tuned them, and every later palette switch would be silently pinned.
+ * Palette bookkeeping: a colour token whose value is anything the theme already
+ * gets for free (factory default, manifest config, or the selected 配色方案) is
+ * *not* persisted. Otherwise the first save would bake those values into
+ * `themes.config` as if the user had hand-tuned them, and every later palette
+ * switch would be silently pinned to the factory colours.
  */
 export async function updateThemePanel(
   idOrSlug: string | number,
@@ -391,19 +392,39 @@ export async function updateThemePanel(
   const nextRaw = payload.palette;
   const nextPalette =
     typeof nextRaw === "string" && nextRaw ? nextRaw : previousPalette;
-  const palettes: (string | null)[] = [previousPalette, nextPalette];
 
-  const configPatch: Record<string, string> = {};
+  const incoming: Record<string, string> = {};
   const rest: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(payload)) {
-    if (configKeys.has(k)) {
-      const s = v == null ? "" : String(v);
-      // Never store "the palette said so" values as user overrides.
-      if (isPaletteSupplied(k, s, palettes)) continue;
-      configPatch[k] = s;
-    } else {
-      rest[k] = v;
-    }
+    if (configKeys.has(k)) incoming[k] = v == null ? "" : String(v);
+    else rest[k] = v;
+  }
+
+  // Only genuine user intent is stored. A token is "free" when it matches ANY
+  // baseline source (factory, manifest, either palette) — note these are
+  // compared as alternatives, not layered, since a value equal to the factory
+  // default is not user intent even while some palette is selected. This also
+  // drops values left behind by saves made before this rule existed, so rows
+  // heal themselves on the next save.
+  const freeSources: Record<string, unknown>[] = [
+    DEFAULT_THEME_CONFIG,
+    getThemeManifest(theme.slug)?.config ?? {},
+    getPalettePreset(previousPalette)?.tokens ?? {},
+    getPalettePreset(nextPalette)?.tokens ?? {},
+  ];
+  const isFree = (k: string, v: string) =>
+    freeSources.some((src) => typeof src[k] === "string" && String(src[k]).trim() === v);
+
+  // Explicitly submitted keys win over what was stored — a cleared field must
+  // actually come back out of the row, not linger as an invisible override.
+  const submitted: Record<string, unknown> = { ...theme.config };
+  for (const [k, v] of Object.entries(incoming)) submitted[k] = v;
+
+  const config: Record<string, string> = {};
+  for (const [k, v] of Object.entries(submitted)) {
+    const s = String(v ?? "").trim();
+    if (!s || isFree(k, s)) continue;
+    config[k] = s;
   }
 
   const settingsPatch = coerceSettings(getThemeSettingsSchema(theme.slug), rest);
@@ -411,7 +432,7 @@ export async function updateThemePanel(
   const [row] = await db
     .update(themes)
     .set({
-      config: { ...theme.config, ...configPatch } as ThemeConfig,
+      config: config as ThemeConfig,
       settings: { ...theme.settings, ...settingsPatch },
     })
     .where(eq(themes.id, theme.id))
@@ -477,5 +498,13 @@ async function getActiveThemeRenderConfigUncached(): Promise<ThemeConfig> {
     getActiveTheme(),
     getActiveThemeSettings(),
   ]);
-  return applyPalette(theme.config, settings.palette as string | undefined);
+  // Same cascade the admin panel shows (factory → manifest → 配色方案 → saved
+  // overrides), so a token that merely echoes its baseline is ignored instead
+  // of pinning every later palette switch.
+  const manifest = getThemeManifest(theme.slug);
+  return paletteLayeredConfig(
+    theme.config,
+    { ...DEFAULT_THEME_CONFIG, ...(manifest?.config ?? {}) },
+    settings.palette as string | undefined,
+  );
 }

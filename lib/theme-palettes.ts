@@ -227,57 +227,31 @@ export function getPalettePreset(key: string | null | undefined): PalettePreset 
 }
 
 /**
- * 把配色方案作为「默认层」叠加到主题 config 之下。
+ * 把当前实际生效的令牌拼出来，优先级自下而上：
+ * `baseline`（出厂默认 → manifest）→ **配色方案** → 用户真正的微调。
  *
- * 优先级：`DEFAULT_THEME_CONFIG` → `manifest.config` → **配色方案** →
- * `theme.config`（用户在「外观」面板的手动微调）。
+ * 关键点是「用户真正的微调」：`theme.config` 里塞满了与出厂默认同值的令牌
+ * （后台每次保存都会把面板上所有当前值回传），这些不是用户意图，必须剔掉，
+ * 否则它们会盖住配色方案 —— 表现为「换配色方案毫无效果」。这里按值比较，
+ * 所以历史遗留的脏数据也能自愈，不需要数据迁移。
  *
- * 也就是说配色方案只负责填上用户没改过的颜色，用户一旦在「外观」面板里
- * 动过某个色值，那次微调永远优先 —— 这套语义要求保存时把「与预设同值」
- * 的令牌剔除掉（见 lib/services/themes.ts 的 updateThemePanel），否则
- * 预设值会被当成用户微调永久写进 config，之后就再也换不动了。
- *
- * 未选择（key 为空）或 key 非法时原样返回 config，保证老站点升级后
- * 视觉零变化。键名与 `ThemeConfig` 同名，可直接喂给 `themeToCss`。
+ * 键名与 `ThemeConfig` 同名，可直接喂给 `themeToCss`。
  */
-export function applyPalette<T extends ThemeConfig | null | undefined>(
-  config: T,
+export function paletteLayeredConfig(
+  config: ThemeConfig | null | undefined,
+  baseline: Partial<ThemeConfig>,
   key: string | null | undefined,
 ): ThemeConfig {
-  const preset = getPalettePreset(key);
-  const overrides = (config ?? {}) as ThemeConfig;
-  if (!preset) return overrides;
-  // 预设在底、用户微调在上。
-  return { ...preset.tokens, ...overrides };
-}
-
-/** 供后台下拉直接消费的选项数组。 */
-export function paletteOptions(): { value: string; label: string }[] {
-  return PALETTE_PRESETS.map((p) => ({ value: p.key, label: p.label }));
-}
-
-/**
- * 判断某个令牌的当前值是否「只是配色方案提供的默认值」，即用户其实没有
- * 手动微调过它。
- *
- * 保存主题设置时把这类令牌剔除是有意的：预设值没必要落进 `themes.config`，
- * 一旦落进去就会从「方案默认」悄悄升级成「永久覆盖」，之后切换配色方案
- * 时本该变色的项会被这些陈旧值按住不动。
- */
-export function isPaletteSupplied(
-  key: string,
-  value: string,
-  paletteKeys: (string | null | undefined)[],
-): boolean {
-  const v = value.trim();
-  if (!v) return true; // 空值从来不是有意义的覆盖
-  for (const pk of paletteKeys) {
-    const preset = getPalettePreset(pk);
-    if (!preset) continue;
-    const own = preset.tokens[key as keyof PaletteTokens];
-    if (typeof own === "string" && own.trim() === v) return true;
+  const base = baseline as Record<string, unknown>;
+  const real: Record<string, string> = {};
+  for (const [k, v] of Object.entries((config ?? {}) as Record<string, unknown>)) {
+    const s = typeof v === "string" ? v.trim() : "";
+    if (!s) continue;
+    if (typeof base[k] === "string" && String(base[k]).trim() === s) continue;
+    real[k] = s;
   }
-  return false;
+  const preset = getPalettePreset(key);
+  return { ...base, ...(preset?.tokens ?? {}), ...real } as ThemeConfig;
 }
 
 /** 配色方案会覆盖到的全部令牌键名。 */

@@ -37,7 +37,7 @@ export default async function OboePressPageBySlug({ params }: { params: { slug: 
     <>
       <div className="mx-auto max-w-3xl">
         <article>
-          <h1 className="text-3xl font-bold leading-tight text-zinc-100">{page.title}</h1>
+          <h1 className="text-3xl font-bold leading-tight text-[var(--text)]">{page.title}</h1>
           <div className="prose-cms mt-8" dangerouslySetInnerHTML={{ __html: html }} />
         </article>
 

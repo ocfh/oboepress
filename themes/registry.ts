@@ -107,7 +107,8 @@ export interface ThemeModule {
    *  blog/category/search route pages render with the theme instead of the
    *  default OboePress markup. */
   BlogListPage?: React.ComponentType<{ page: number }>;
-  CategoryPage?: React.ComponentType<{ slug: string }>;
+  CategoryPage?: React.ComponentType<{ slug: string; page?: number }>;
+  TagPage?: React.ComponentType<{ slug: string; page?: number }>;
   SearchPage?: React.ComponentType<{ q: string; page?: number; all?: boolean }>;
   /** Optional theme-branded 404 screen; falls back to the shared one. */
   NotFoundPage?: React.ComponentType<{ settings: NotFoundSettings }>;
@@ -287,6 +288,7 @@ export async function loadThemeModule(slug: string): Promise<ThemeModule | null>
       PageBySlug: mod.PageBySlug,
       BlogListPage: mod.BlogListPage,
       CategoryPage: mod.CategoryPage,
+      TagPage: mod.TagPage,
       SearchPage: mod.SearchPage,
       NotFoundPage: mod.NotFoundPage,
     };

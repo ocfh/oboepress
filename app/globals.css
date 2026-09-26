@@ -25,10 +25,23 @@
     "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
+/* 横向裁剪放在文档根上，且用 clip 而不是 hidden：
+   - hidden 会让根变成滚动容器，position:sticky 的侧栏会失效；
+   - clip 只裁切、不产生滚动容器，sticky 行为不受影响。
+   目的：主题 CSS 生效前（首屏样式注入/慢网）导航菜单那条横向轨道是未裁剪的，
+   它的真实宽度（实测 790px）会把整个文档撑到 850px，此时 .nav-top 还没拿到
+   position:fixed，于是顶栏跟着一起变宽、突出页面，等 CSS 到位才缩回。
+   这里是唯一一处能拦住「任何未裁剪内容撑宽文档」的地方，比逐个组件补
+   overflow 更稳，也不会裁掉 fixed 的抽屉/弹窗（fixed 不受根 overflow 约束）。 */
+html {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
+  overflow-x: clip;
 }
 
 /* 背景光晕层：主题「配色方案 → 背景光晕」开启时由 Layout 渲染。
